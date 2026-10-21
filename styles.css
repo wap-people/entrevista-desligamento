@@ -117,7 +117,7 @@ textarea { max-width: 100%; min-height: 96px; resize: vertical; }
 .ms-o .check:hover { background: var(--bg-alt); }
 .ms-o .check input { flex: none; width: 18px; height: 18px; accent-color: var(--bar); }
 .ms-n { margin-left: auto; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 24px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 12px; margin-top: 24px; }
 .tile { background: var(--bg-alt); border-radius: 12px; padding: 18px 20px; min-width: 0; }
 .tile b { display: block; font-size: 40px; font-weight: 800; line-height: 1.05; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .tile span { color: var(--muted); font-size: 14px; display: block; margin-top: 4px; }
@@ -136,7 +136,7 @@ table { border-collapse: collapse; width: 100%; min-width: 600px; font-size: 14p
 th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 td.act { text-align: right; white-space: nowrap; }
-td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .lnk { font: inherit; font-size: 14px; background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 4px; }
 .lnk.danger { color: var(--err); font-weight: 600; }
 .det td { background: var(--bg-alt); }
@@ -144,9 +144,6 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .det dt { color: var(--muted); }
 .det dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .empty { margin-top: 32px; padding: 32px; border: 1px dashed var(--line-strong); border-radius: 12px; color: var(--muted); }
-.terms { display: flex; flex-wrap: wrap; gap: 8px; }
-.term { padding: 6px 14px; border-radius: 999px; background: var(--bg-alt); font-size: 15px; }
-.term b { margin-left: 8px; color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
 .quote { margin: 0 0 14px; padding: 4px 0 4px 16px; border-left: 3px solid var(--bar); }
 .quote p { margin: 0; overflow-wrap: anywhere; }
 .quote small { color: var(--muted); }
@@ -181,3 +178,10 @@ footer { padding-block: 40px 56px; color: var(--muted); font-size: 13px; }
   .det dl { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: no-preference) { .chip span, .btn { transition: background-color .12s, border-color .12s; } }
+
+/* Indicadores contados como história */
+.story { font-size: 18px; line-height: 1.55; margin: 16px 0 0; max-width: 72ch; }
+.lead { font-weight: 600; margin: 0 0 8px; }
+.sub-h { font-size: 20px; margin: 40px 0 0; padding-top: 16px; border-top: 1px solid var(--line); }
+.tile small { display: block; margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.35; }
+.chart .lnk { margin-top: 8px; }
