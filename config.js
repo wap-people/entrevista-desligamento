@@ -5,5 +5,5 @@
 // NUNCA coloque aqui a chave "service_role".
 window.APP_CONFIG = {
   SUPABASE_URL: 'https://zitxglgcizmqnkxhttac.supabase.co',
-  SUPABASE_ANON_KEY: 'COLE_AQUI_A_CHAVE_ANON'
+  SUPABASE_ANON_KEY: 'sb_publishable_igbTqSugdVWlcwWj-wSIpQ_daWxk69C'
 };

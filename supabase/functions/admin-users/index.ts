@@ -1,5 +1,6 @@
 // Edge Function "admin-users": cadastro e gestão de usuários da Entrevista de Desligamento V2.
 // Só administradores ativos (public.members.is_admin) podem chamar.
+// Publicada com verify_jwt = false: a própria função confere a sessão (auth.getUser) e o papel de admin.
 // Ações (POST JSON):
 //   { action: "create", email, password, full_name, is_admin }
 //   { action: "update", user_id, full_name?, is_admin?, active?, password? }
@@ -18,13 +19,22 @@ function json(body: unknown, status = 200) {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Chave de servidor: a nova (SUPABASE_SECRET_KEYS, JSON { nome: "sb_secret_..." }) ou a legada (service_role).
+function serverKey(): string {
+  try {
+    const keys = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") || "{}");
+    const k = keys.default || Object.values(keys)[0];
+    if (typeof k === "string" && k) return k;
+  } catch { /* usa a legada */ }
+  return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Método não permitido." }, 405);
 
   const url = Deno.env.get("SUPABASE_URL")!;
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin = createClient(url, serverKey(), { auth: { persistSession: false, autoRefreshToken: false } });
 
   // quem está chamando?
   const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");

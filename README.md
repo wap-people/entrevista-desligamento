@@ -21,10 +21,10 @@ Formulário para o time de People conduzir e registrar entrevistas de desligamen
 
 ## Configuração (uma vez)
 
-1. **Banco**: no painel do Supabase, abra **SQL Editor**, cole o conteúdo de `supabase/migrations/001_schema.sql` e rode.
+1. **Banco**: no painel do Supabase, abra **SQL Editor** e rode, em ordem, os arquivos de `supabase/migrations/` (`001_schema.sql`, `002_security_advisor.sql`).
 2. **Primeira administradora**: em **Authentication > Users > Add user > Create new user**, crie `ana.beatriz@wap.ind.br` com uma senha e marque *Auto Confirm User*. Ela vira admin sozinha.
 3. **Cadastro público desligado**: em **Authentication > Sign In / Providers**, desative *Allow new users to sign up*.
-4. **Edge Function** `admin-users` (para a aba Usuários): em **Edge Functions > Deploy a new function > Via Editor**, nome `admin-users`, cole `supabase/functions/admin-users/index.ts` e publique. Ou, com a Supabase CLI: `supabase functions deploy admin-users`.
+4. **Edge Function** `admin-users` (para a aba Usuários): em **Edge Functions > Deploy a new function > Via Editor**, nome `admin-users`, cole `supabase/functions/admin-users/index.ts`, **desligue "Verify JWT"** (a função confere a sessão e o papel de admin sozinha) e publique. Ou, com a Supabase CLI: `supabase functions deploy admin-users --no-verify-jwt`.
 5. **Chave pública**: em **Project Settings > API**, copie a chave `anon` (ou *publishable*) para `config.js`. Nunca use a chave `service_role` no site.
 6. **GitHub Pages**: no repositório, **Settings > Pages > Deploy from a branch > main / (root)**.
 
