@@ -53,6 +53,8 @@
     { id: "feedback", label: Q.feedback, type: "radio", options: FEEDBACK, req: 1, when: participa },
     { id: "salario", label: Q.salario, type: "radio", options: ESCALA, req: 1, when: participa },
     { id: "beneficios", label: Q.beneficios, type: "radio", options: ESCALA, req: 1, when: participa },
+    { id: "beneficioMelhor", label: "Qual benefício mais te atendia?", type: "text", when: participa },
+    { id: "beneficioMelhoria", label: "Qual benefício tem maior oportunidade de melhoria?", type: "text", when: participa },
     { id: "desenvolvimento", label: Q.desenvolvimento, type: "radio", options: ESCALA, req: 1, when: participa },
     { id: "equilibrio", label: Q.equilibrio, type: "radio", options: ESCALA, req: 1, when: participa },
     { sec: "Saída e Recomendação", c: "--p4", when: participa },
@@ -68,6 +70,7 @@
     ["iniciativa", "Iniciativa do desligamento"], ["aceitou", "Aceitou participar"], ["principalFator", "Principal fator da saída"], ["secundarios", "Fatores secundários"],
     ["motivoInvoluntario", "Motivo do desligamento involuntário"], ["climaArea", "Clima na grande área"], ["climaEmpresa", "Clima na empresa"],
     ["gestorRel", "Relacionamento com o gestor"], ["feedback", "Feedback nos últimos 6 meses"], ["salario", "Salário"], ["beneficios", "Benefícios"],
+    ["beneficioMelhor", "Benefício que mais atendia"], ["beneficioMelhoria", "Benefício com maior oportunidade de melhoria"],
     ["desenvolvimento", "Desenvolvimento e crescimento"], ["equilibrio", "Equilíbrio vida pessoal e profissional"], ["voltaria", "Voltaria a trabalhar na WAP"],
     ["nps", "Recomendação (0 a 10)"], ["mudaria", "O que mudaria"], ["legado", "Respostas da base 2024"], ["obs", "Observações gerais do entrevistador"]
   ];
@@ -321,6 +324,11 @@
 
   // Chave para agrupar nomes digitados de jeitos diferentes ("JOÃO SILVA", "Joao  Silva").
   function fold(s) { return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase(); }
+  // De { grafia: vezes }, a mais usada; no empate, a que não é toda maiúscula e tem acento.
+  function bestName(names) {
+    var nice = function (s) { return (s !== s.toUpperCase() ? 2 : 0) + (s !== fold(s) && /[^\x00-\x7f]/.test(s) ? 1 : 0); };
+    return Object.keys(names).sort(function (a, b) { return names[b] - names[a] || nice(b) - nice(a); })[0];
+  }
 
   // Filtro de seleção múltipla com busca. Nada marcado = todos.
   function multiSelect(host, title, field, plural) {
@@ -371,10 +379,7 @@
           g[k].n++; g[k].names[v] = (g[k].names[v] || 0) + 1;
         });
         opts = Object.keys(g).map(function (k) {
-          // empate: prefere a grafia que não é toda maiúscula e que tem acento
-          var nice = function (s) { return (s !== s.toUpperCase() ? 2 : 0) + (s !== fold(s) && /[^\x00-\x7f]/.test(s) ? 1 : 0); };
-          var names = g[k].names, best = Object.keys(names).sort(function (a, b) { return names[b] - names[a] || nice(b) - nice(a); })[0];
-          return { key: k, n: g[k].n, label: best };
+          return { key: k, n: g[k].n, label: bestName(g[k].names) };
         }).sort(function (a, b) { return a.label.localeCompare(b.label, "pt-BR"); });
         Object.keys(sel).forEach(function (k) { if (!g[k]) delete sel[k]; });
         summary.textContent = label(); draw();
@@ -439,6 +444,29 @@
     });
     return box;
   }
+  // Respostas abertas sobre benefícios: as mais citadas, agrupando grafias ("Plano de saúde" = "plano de saude").
+  function citados(resp) {
+    var box = el("div", { class: "chart" }, [el("h3", { text: "Benefícios citados" }), el("p", { class: "hint", text: "Respostas abertas de quem participou. Mostra as 8 mais citadas de cada pergunta." })]);
+    var any = false;
+    [["beneficioMelhor", "O que mais atendia"], ["beneficioMelhoria", "Maior oportunidade de melhoria"]].forEach(function (q) {
+      var g = {}, tot = 0;
+      resp.forEach(function (x) {
+        var v = x[q[0]] ? String(x[q[0]]).trim() : ""; if (!v) return;
+        var k = fold(v); g[k] = g[k] || { n: 0, names: {} }; g[k].n++; g[k].names[v] = (g[k].names[v] || 0) + 1; tot++;
+      });
+      Object.keys(g).forEach(function (k) { g[k].label = bestName(g[k].names); });
+      box.appendChild(el("p", { text: q[1], style: "font-weight:600;margin:16px 0 4px" }));
+      if (!tot) { box.appendChild(el("p", { class: "hint", text: "Sem respostas neste filtro." })); return; }
+      any = true;
+      Object.keys(g).sort(function (a, b) { return g[b].n - g[a].n; }).slice(0, 8).forEach(function (k) {
+        var p = Math.round((g[k].n / tot) * 100);
+        var fl = el("div", { class: "fl" }); fl.style.width = p + "%";
+        box.appendChild(el("div", { class: "br" }, [el("span", { text: g[k].label }), el("div", { class: "tr" }, [fl]), el("span", { class: "n", text: g[k].n + " (" + p + "%)" })]));
+      });
+    });
+    if (!any) box.querySelector(".hint").textContent = "Perguntas novas: as respostas aparecem aqui conforme as entrevistas do V2 forem registradas.";
+    return box;
+  }
   function tile(v, label) { return el("div", { class: "tile" }, [el("b", { text: v }), el("span", { text: label })]); }
 
   function renderMain(list) {
@@ -491,6 +519,7 @@
       sb2.appendChild(el("div", { class: "br" }, [el("span", { text: d[1] }), tr, el("span", { class: "n", text: fmt(good(resp, d[0]), "%") })]));
     });
     host.appendChild(sb2);
+    host.appendChild(citados(resp));
     host.appendChild(bars("Feedback do gestor nos últimos 6 meses", null, resp, "feedback", FEEDBACK));
 
     var tb = el("tbody");
@@ -509,7 +538,7 @@
   function comments(list) {
     var out = [];
     list.forEach(function (x) {
-      ["mudaria", "secundarios"].forEach(function (k) {
+      ["mudaria", "secundarios", "beneficioMelhoria"].forEach(function (k) {
         var t = x[k] ? String(x[k]).trim() : "";
         if (t.length > 3) out.push({ t: t, u: x.unidade || "", s: x.setor || "", nps: x.nps, k: k });
       });
@@ -536,7 +565,8 @@
     top.forEach(function (w) { terms.appendChild(el("span", { class: "term" }, [document.createTextNode(w), el("b", { text: String(freq[w]) })])); });
     q.appendChild(el("h3", { text: "Comentários recentes", style: "font-size:18px;margin:0 0 12px" }));
     cm.slice(0, 8).forEach(function (c) {
-      var meta = [c.k === "mudaria" ? "O que mudaria" : "Fator secundário", c.s, c.u].filter(Boolean).join(" · ");
+      var tipo = { mudaria: "O que mudaria", secundarios: "Fator secundário", beneficioMelhoria: "Benefício a melhorar" }[c.k];
+      var meta = [tipo, c.s, c.u].filter(Boolean).join(" · ");
       q.appendChild(el("blockquote", { class: "quote" }, [el("p", { text: c.t }), el("small", { text: meta })]));
     });
   }
