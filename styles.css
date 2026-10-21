@@ -209,3 +209,25 @@ footer { padding-block: 40px 56px; color: var(--muted); font-size: 13px; }
 .legend i.nd { background: color-mix(in srgb, var(--s4) 35%, transparent); }
 .legend i.nn { background: color-mix(in srgb, var(--s3) 60%, transparent); }
 .legend i.npr { background: color-mix(in srgb, var(--s1) 40%, transparent); }
+/* Experiência: barra empilhada com quantidade e % de cada avaliação */
+:root { --t1: #FFFFFF; --t2: #1A1A1A; --t3: #1A1A1A; --t4: #FFFFFF; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --t1: #1A1A1A; --t2: #FFFFFF; --t3: #1A1A1A; --t4: #1A1A1A; } }
+:root[data-theme="dark"] { --t1: #1A1A1A; --t2: #FFFFFF; --t3: #1A1A1A; --t4: #1A1A1A; }
+.xp { display: grid; grid-template-columns: minmax(0, 12rem) 1fr 5.5rem; gap: 6px 14px; align-items: start; padding-block: 10px; border-bottom: 1px solid var(--line); }
+.xp-h { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding-block: 4px 8px; }
+.xp-h span:last-child, .xp-p { text-align: right; }
+.xp-l { font-size: 15px; display: flex; flex-direction: column; }
+.xp-l small, .xp-p small { color: var(--muted); font-size: 13px; }
+.xp-p { display: flex; flex-direction: column; }
+.xp-p b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.xp-bar { display: flex; gap: 2px; height: 26px; border-radius: 6px; overflow: hidden; }
+.xp-bar .seg { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
+.xp-bar .s1 { background: var(--s1); color: var(--t1); } .xp-bar .s2 { background: var(--s2); color: var(--t2); }
+.xp-bar .s3 { background: var(--s3); color: var(--t3); } .xp-bar .s4 { background: var(--s4); color: var(--t4); }
+.xp-d { display: block; margin-top: 4px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.duo { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0 32px; }
+@media (max-width: 560px) {
+  .xp { grid-template-columns: 1fr 4.5rem; }
+  .xp > div { grid-column: 1 / -1; grid-row: 2; }
+  .xp-h span:nth-child(2) { display: none; }
+}

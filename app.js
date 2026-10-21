@@ -506,7 +506,7 @@
   function bars(title, hint, list, get, opts) {
     opts = opts || {};
     var t = tally(list, get, opts.order);
-    var box = chart(title, (hint ? hint + " " : "") + "Base: " + t.tot + (t.tot === 1 ? " resposta." : " respostas."));
+    var box = chart(title, (hint ? hint + " " : "") + "Base: " + t.tot + (t.tot === 1 ? " resposta." : " respostas.") + smallBase(t.tot));
     if (!t.tot) { box.appendChild(el("p", { class: "hint", text: "Sem respostas neste filtro." })); return box; }
     var key = "bars:" + (opts.id || title), lim = opts.limit || 999;
     t.items.slice(0, expanded[key] ? 9999 : lim).forEach(function (it, i) { box.appendChild(barRow(it.label, it.n, t.tot, opts.colors && opts.colors[i])); });
@@ -526,7 +526,7 @@
   function npsBlock(st, list, title) {
     var box = chart(title || "Recomendação (eNPS)", "Nota de 0 a 10 para recomendar a WAP como lugar para trabalhar. Detratores: 0 a 6. Neutros: 7 e 8. Promotores: 9 e 10. eNPS = % de promotores menos % de detratores.");
     if (!st.npsN) { box.appendChild(el("p", { class: "hint", text: "Sem notas neste filtro (a base 2024 não tinha esta pergunta)." })); return box; }
-    box.appendChild(el("p", { class: "lead", text: "eNPS " + st.nps + " pontos, calculado sobre " + st.npsN + (st.npsN === 1 ? " nota." : " notas.") }));
+    box.appendChild(el("p", { class: "lead", text: "eNPS " + st.nps + " pontos, calculado sobre " + st.npsN + (st.npsN === 1 ? " nota." : " notas.") + smallBase(st.npsN) }));
     [["Promotores (9 e 10)", st.pro, "--s1"], ["Neutros (7 e 8)", st.neu, "--s3"], ["Detratores (0 a 6)", st.det, "--s4"]].forEach(function (g) { box.appendChild(barRow(g[0], g[1], st.npsN, g[2])); });
     var notas = list.filter(function (x) { return isResp(x) && typeof x.nps === "number"; });
     // Distribuição por nota, com fundo leve por faixa (detrator, neutro, promotor)
@@ -545,26 +545,43 @@
     return box;
   }
 
-  // Experiência: cada dimensão com Excelente/Bom/Regular/Ruim em quantidade e %.
+  // Experiência: cada dimensão numa barra empilhada, com quantidade e % de cada avaliação sempre à vista.
+  // Ordem: da mais bem avaliada para a mais mal avaliada. À direita: avaliações positivas (bom ou excelente).
   function expTable(resp) {
-    var box = chart("Como avaliam a experiência", "Quem aceitou participar. Cada linha mostra quantas pessoas deram cada avaliação e a porcentagem sobre quem respondeu aquela pergunta. O número ao lado da barra é a parcela de bom ou excelente.");
+    var dims = DIM.map(function (d) {
+      var a = answered(resp, d[0]);
+      return { key: d[0], label: d[1], n: a.length, g: goodN(a, d[0]), c: ESCALA.map(function (k) { return a.filter(function (x) { return x[d[0]] === k; }).length; }) };
+    }).filter(function (d) { return d.n; }).sort(function (a, b) { return b.g / b.n - a.g / a.n; });
+    var minN = dims.reduce(function (m, d) { return Math.min(m, d.n); }, Infinity);
+    var box = chart("Como avaliam a experiência", "Quem aceitou participar. Ordenado da dimensão mais bem avaliada para a mais mal avaliada. À direita, as avaliações positivas (bom ou excelente) sobre quem respondeu." + smallBase(minN));
+    if (!dims.length) { box.appendChild(el("p", { class: "hint", text: "Sem respostas neste filtro." })); return box; }
     var lg = el("div", { class: "legend" });
     ESCALA.forEach(function (k, i) { lg.appendChild(el("span", null, [el("i", { style: "background:var(--s" + (i + 1) + ")" }), document.createTextNode(k)])); });
     box.appendChild(lg);
-    var rows = [];
-    DIM.forEach(function (d) {
-      var a = answered(resp, d[0]);
-      var stack = el("div", { class: "tr" });
-      ESCALA.forEach(function (k, i) {
-        var n = a.filter(function (x) { return x[d[0]] === k; }).length; if (!n) return;
-        var s = el("div", { class: "seg", title: k + ": " + n }); s.style.width = (n / a.length) * 100 + "%"; s.style.background = "var(--s" + (i + 1) + ")"; stack.appendChild(s);
+    box.appendChild(el("div", { class: "xp xp-h" }, [el("span", { text: "Dimensão" }), el("span", { text: "Distribuição" }), el("span", { text: "Positivas" })]));
+    dims.forEach(function (d) {
+      var stack = el("div", { class: "xp-bar" });
+      d.c.forEach(function (n, i) {
+        if (!n) return;
+        var p = Math.round((n / d.n) * 100);
+        var s = el("div", { class: "seg s" + (i + 1), title: ESCALA[i] + ": " + n + " de " + d.n + " (" + p + "%)" });
+        s.style.width = (n / d.n) * 100 + "%";
+        if (p >= 14) s.textContent = n + " · " + p + "%"; else if (p >= 6) s.textContent = String(n);
+        stack.appendChild(s);
       });
-      box.appendChild(el("div", { class: "br" }, [el("span", { text: d[1] }), stack, el("span", { class: "n", text: a.length ? pct(goodN(a, d[0]), a.length) + "%" : "-" })]));
-      rows.push([d[1]].concat(ESCALA.map(function (k) { return np(a.filter(function (x) { return x[d[0]] === k; }).length, a.length); }), [String(a.length), np(goodN(a, d[0]), a.length)]));
+      // Linha com todos os números só quando alguma faixa é estreita demais para mostrar quantidade e %
+      var cramped = d.c.some(function (n) { return n && Math.round((n / d.n) * 100) < 14; });
+      var detail = cramped ? el("small", { class: "xp-d", text: ESCALA.map(function (k, i) { return k + " " + np(d.c[i], d.n); }).join(" · ") }) : null;
+      box.appendChild(el("div", { class: "xp" }, [
+        el("span", { class: "xp-l" }, [document.createTextNode(d.label), el("small", { text: d.n + (d.n === 1 ? " resposta" : " respostas") })]),
+        el("div", null, [stack, detail]),
+        el("span", { class: "xp-p" }, [el("b", { text: pct(d.g, d.n) + "%" }), el("small", { text: d.g + " de " + d.n })])
+      ]));
     });
-    box.appendChild(table(["Dimensão", "Excelente", "Bom", "Regular", "Ruim", "Responderam", "Bom ou excelente"], rows, 1));
     return box;
   }
+  // Aviso de base pequena: abaixo de 20 respostas, % muda muito com poucas pessoas.
+  function smallBase(n) { return n > 0 && n < 20 && n !== Infinity ? " Base pequena (" + n + "): leia com cautela." : ""; }
 
   // Comentários completos, com contexto. Mostra 5 e "Mostrar todos".
   function quotes(title, hint, list, key, metaFn) {
@@ -588,13 +605,16 @@
     var st = stats(list), resp = st.resp, wrap = el("div");
     if (list.some(isVol)) wrap.appendChild(bars("Principal fator da saída voluntária", "Quem pediu para sair e aceitou a entrevista.", resp.filter(isVol), field("principalFator"), { id: "fator" }));
     if (list.some(isInv)) wrap.appendChild(bars("Motivo do desligamento involuntário", "Todos os desligamentos por iniciativa da empresa, mesmo com recusa da entrevista.", list.filter(isInv), field("motivoInvoluntario"), { id: "motivo" }));
-    wrap.appendChild(bars("Aceitou participar da entrevista?", null, list, field("aceitou"), { id: "aceitou", order: SN, colors: ["--s1", "--s4"] }));
+    // "Aceitou participar" e "Voltaria" ficam nos cartões (sim e não, com quantidade e %).
     wrap.appendChild(npsBlock(st, list));
     wrap.appendChild(expTable(resp));
     wrap.appendChild(bars("Feedback do gestor nos últimos 6 meses", "Na base 2024 a pergunta era “recebeu feedbacks no período?” (Nunca / Às vezes / Sempre), convertida de forma aproximada.", resp, field("feedback"), { id: "fb", order: FEEDBACK }));
-    wrap.appendChild(bars("Voltaria a trabalhar na WAP?", null, resp, field("voltaria"), { id: "volta", order: SN, colors: ["--s1", "--s4"] }));
-    wrap.appendChild(bars("Benefício que mais atendia", "Resposta aberta; respostas iguais escritas de jeitos diferentes contam juntas.", resp, field("beneficioMelhor"), { id: "bm", limit: 8 }));
-    wrap.appendChild(bars("Benefício com maior oportunidade de melhoria", "Resposta aberta; respostas iguais escritas de jeitos diferentes contam juntas.", resp, field("beneficioMelhoria"), { id: "bo", limit: 8 }));
+    // Benefícios lado a lado: o que funcionava e o que precisa melhorar
+    var ben = el("div", { class: "duo" }, [
+      bars("Benefício que mais atendia", "Resposta aberta; grafias diferentes contam juntas.", resp, field("beneficioMelhor"), { id: "bm", limit: 6 }),
+      bars("Benefício a melhorar", "Resposta aberta; grafias diferentes contam juntas.", resp, field("beneficioMelhoria"), { id: "bo", limit: 6 })
+    ]);
+    wrap.appendChild(ben);
     return wrap;
   }
 
@@ -734,9 +754,9 @@
 
     var tiles = [tile(String(st.n), t ? "saídas" : "saídas no filtro", t ? nOf(st.n, base.n) + " do total" : null)];
     if (!t) tiles.push(tile(String(st.nVol), "voluntárias", np(st.nVol, st.n)), tile(String(st.nInv), "involuntárias", np(st.nInv, st.n)));
-    tiles.push(tile(fmt(st.adesao, "%"), "aceitaram a entrevista", nOf(st.nResp, st.n)),
+    tiles.push(tile(fmt(st.adesao, "%"), "aceitaram a entrevista", nOf(st.nResp, st.n) + " · " + (st.n - st.nResp) + " recusaram (" + pct(st.n - st.nResp, st.n) + "%)"),
       tile(fmt(st.nps), "eNPS", st.npsN ? np(st.pro, st.npsN) + " promotores · " + np(st.neu, st.npsN) + " neutros · " + np(st.det, st.npsN) + " detratores" : "sem notas"),
-      tile(fmt(st.volta, "%"), "voltariam", st.voltaN ? nOf(st.voltaSim, st.voltaN) : "sem respostas"));
+      tile(fmt(st.volta, "%"), "voltariam a trabalhar na WAP", st.voltaN ? nOf(st.voltaSim, st.voltaN) + " · " + (st.voltaN - st.voltaSim) + " não voltariam (" + pct(st.voltaN - st.voltaSim, st.voltaN) + "%)" : "sem respostas"));
     host.appendChild(el("div", { class: "tiles" }, tiles));
 
     if (!t) {
