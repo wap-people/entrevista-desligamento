@@ -9,7 +9,7 @@ Formulário para o time de People conduzir e registrar entrevistas de desligamen
 ## Telas
 
 1. **Nova entrevista**: formulário em seções, com perguntas condicionais e validação. O entrevistador já vem marcado com o usuário logado.
-2. **Indicadores**: cartões, eNPS, principal fator, motivo involuntário, experiência, feedback, por unidade e comentários. Filtro por unidade e período.
+2. **Indicadores**: cartões, eNPS, principal fator, motivo involuntário, experiência, feedback, por unidade e comentários. Filtros por unidade, período, origem (V2 ou base 2024) e, com seleção múltipla e busca, por gestor e por área. Nomes de gestor escritos de jeitos diferentes (maiúsculas, acentos, espaços) são agrupados.
 3. **Respostas**: lista, detalhe, **Baixar Excel** (abas Entrevistas e Indicadores) e exclusão com dois cliques (só administradoras).
 4. **Usuários** (só administradoras): criar usuário, trocar senha, dar ou tirar admin, desativar. Mostra a auditoria de quem registrou e quem excluiu cada entrevista.
 

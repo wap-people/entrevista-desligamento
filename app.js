@@ -319,6 +319,72 @@
   $("#fp").addEventListener("change", renderAll);
   $("#fo").addEventListener("change", renderAll);
 
+  // Chave para agrupar nomes digitados de jeitos diferentes ("JOÃO SILVA", "Joao  Silva").
+  function fold(s) { return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim().toLowerCase(); }
+
+  // Filtro de seleção múltipla com busca. Nada marcado = todos.
+  function multiSelect(host, title, field, plural) {
+    var sel = {}, opts = [];
+    var summary = el("summary", { text: "Todos" });
+    var search = el("input", { type: "search", placeholder: "Buscar", "aria-label": "Buscar " + plural });
+    var list = el("div", { class: "ms-o" });
+    var all = el("button", { class: "lnk", type: "button", text: "Marcar os visíveis" });
+    var none = el("button", { class: "lnk", type: "button", text: "Limpar" });
+    var det = el("details", null, [summary, el("div", { class: "ms-p" }, [search, el("div", { class: "row" }, [all, none]), list])]);
+    host.appendChild(el("div", { class: "ms" }, [el("span", { class: "ms-l", text: title }), det]));
+
+    function count() { return Object.keys(sel).length; }
+    function label() {
+      var n = count();
+      if (!n) return "Todos";
+      if (n === 1) { var k = Object.keys(sel)[0]; var o = opts.filter(function (x) { return x.key === k; })[0]; return o ? o.label : "1 selecionado"; }
+      return n + " selecionados";
+    }
+    function draw() {
+      var q = fold(search.value);
+      list.textContent = "";
+      opts.forEach(function (o) {
+        if (q && fold(o.label).indexOf(q) < 0) return;
+        var cb = el("input", { type: "checkbox" }); cb.checked = !!sel[o.key];
+        cb.addEventListener("change", function () { if (cb.checked) sel[o.key] = 1; else delete sel[o.key]; changed(); });
+        list.appendChild(el("label", { class: "check" }, [cb, document.createTextNode(o.label), el("span", { class: "ms-n", text: String(o.n) })]));
+      });
+      if (!list.childNodes.length) list.appendChild(el("p", { class: "hint", text: "Nada encontrado." }));
+    }
+    function changed() { summary.textContent = label(); renderAll(); }
+    search.addEventListener("input", draw);
+    all.addEventListener("click", function () {
+      var q = fold(search.value);
+      opts.forEach(function (o) { if (!q || fold(o.label).indexOf(q) >= 0) sel[o.key] = 1; });
+      draw(); changed();
+    });
+    none.addEventListener("click", function () { sel = {}; draw(); changed(); });
+    document.addEventListener("click", function (e) { if (det.open && !det.contains(e.target)) det.open = false; });
+
+    return {
+      // opções = valores distintos nas entrevistas, com o nome mais usado de cada grupo
+      refresh: function (rows) {
+        var g = {};
+        rows.forEach(function (x) {
+          var v = x[field]; if (!v) return;
+          var k = fold(v); g[k] = g[k] || { key: k, n: 0, names: {} };
+          g[k].n++; g[k].names[v] = (g[k].names[v] || 0) + 1;
+        });
+        opts = Object.keys(g).map(function (k) {
+          // empate: prefere a grafia que não é toda maiúscula e que tem acento
+          var nice = function (s) { return (s !== s.toUpperCase() ? 2 : 0) + (s !== fold(s) && /[^\x00-\x7f]/.test(s) ? 1 : 0); };
+          var names = g[k].names, best = Object.keys(names).sort(function (a, b) { return names[b] - names[a] || nice(b) - nice(a); })[0];
+          return { key: k, n: g[k].n, label: best };
+        }).sort(function (a, b) { return a.label.localeCompare(b.label, "pt-BR"); });
+        Object.keys(sel).forEach(function (k) { if (!g[k]) delete sel[k]; });
+        summary.textContent = label(); draw();
+      },
+      test: function (x) { return !count() || !!sel[fold(x[field])]; }
+    };
+  }
+  var fGestor = multiSelect($("#fms"), "GESTOR", "gestor", "gestores");
+  var fSetor = multiSelect($("#fms"), "ÁREA", "setor", "áreas");
+
   function pct(a, b) { return b ? Math.round((a / b) * 100) : null; }
   function fmt(v, suf) { return v === null || v === undefined ? "-" : v + (suf || ""); }
   function entryDate(x) { return x.data || (x.criadoEm || "").slice(0, 10); }
@@ -327,7 +393,7 @@
     var u = fu.value, days = Number($("#fp").value), o = $("#fo").value;
     var cut = null;
     if (days) { var d = new Date(); d.setDate(d.getDate() - days); cut = d.toISOString().slice(0, 10); }
-    return entries.filter(function (x) { return (!u || x.unidade === u) && (!cut || entryDate(x) >= cut) && (!o || (x.origem || "V2") === o); });
+    return entries.filter(function (x) { return (!u || x.unidade === u) && (!cut || entryDate(x) >= cut) && (!o || (x.origem || "V2") === o) && fGestor.test(x) && fSetor.test(x); });
   }
   function stats(list) {
     var resp = list.filter(function (x) { return x.aceitou === "Sim"; });
@@ -382,7 +448,7 @@
       return;
     }
     if (!list.length) {
-      host.appendChild(el("div", { class: "empty", text: "Nenhuma entrevista neste filtro. Troque a unidade ou o período." }));
+      host.appendChild(el("div", { class: "empty", text: "Nenhuma entrevista neste filtro. Troque a unidade, o período, o gestor ou a área." }));
       return;
     }
     var st = stats(list);
@@ -532,7 +598,7 @@
   }
 
   function loadEntries() {
-    return store.list().then(function (rows) { entries = rows; renderAll(); })
+    return store.list().then(function (rows) { entries = rows; fGestor.refresh(rows); fSetor.refresh(rows); renderAll(); })
       .catch(function (err) { warn("Não foi possível carregar as entrevistas. " + ((err && err.message) || "Recarregue a página.")); });
   }
   $("#reload").addEventListener("click", loadEntries);
