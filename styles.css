@@ -257,7 +257,7 @@ footer { padding-block: 40px 56px; color: var(--muted); font-size: 13px; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 16px; }
 .kpi { background: var(--bg-alt); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; min-width: 0; border: 1px solid transparent; }
 .kpi-l { font-size: 13px; font-weight: 600; color: var(--muted); line-height: 1.3; }
-.kpi-r { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.kpi-r { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .kpi-v { font-size: 32px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .kpi-r svg { width: 76px; height: auto; flex: none; overflow: visible; }
 .kpi-r svg[viewBox="0 0 42 42"] { width: 46px; }
@@ -269,8 +269,8 @@ footer { padding-block: 40px 56px; color: var(--muted); font-size: 13px; }
 .dn-bg { fill: none; stroke: var(--line); stroke-width: 6; }
 .dn { fill: none; stroke-width: 6; }
 .dn.c-vol { stroke: var(--p4); } .dn.c-inv { stroke: var(--p2); } .dn.c-sem { stroke: var(--p3); }
-.gg { fill: none; stroke-width: 9; } .gg-d { stroke: var(--s4); } .gg-n { stroke: var(--p3); } .gg-p { stroke: var(--s1); }
-.gg-h { stroke: var(--fg); stroke-width: 2.5; stroke-linecap: round; } .gg-c { fill: var(--fg); }
+.gg { fill: none; stroke-width: 11; } .gg-d { stroke: var(--s4); } .gg-n { stroke: var(--p3); } .gg-p { stroke: var(--s1); }
+.gg-h { stroke: var(--fg); stroke-width: 3; stroke-linecap: round; transform-origin: 60px 62px; } .gg-c { fill: var(--fg); }
 .kl { display: flex; flex-wrap: wrap; gap: 2px 12px; }
 .kl i, .mb i { display: inline-block; }
 .kl i { width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
@@ -313,3 +313,14 @@ footer { padding-block: 40px 56px; color: var(--muted); font-size: 13px; }
 .mod-v.txt { font-size: 20px; line-height: 1.25; }
 .btn.danger { background: var(--err); color: #FFFFFF; }
 .kpi-w { display: block; margin-top: 6px; color: var(--err); font-weight: 600; font-size: 12px; }
+/* Legendas dos cartões empilhadas (um item por linha), no mesmo padrão em todos */
+.kpi .kl { flex-direction: column; gap: 3px; }
+/* Medidor do eNPS maior, com marcas −100, 0 e +100 */
+.kpi-r svg.gauge { width: 132px; max-width: 100%; }
+.kpi { overflow: hidden; }
+.gg-t { font-size: 9px; fill: var(--muted); font-family: var(--font); }
+/* Gráficos respondentes: deslizam do valor anterior até o novo */
+.mb i, .br .fl, .xp-bar .seg { transition: width .6s cubic-bezier(.2, .8, .2, 1); }
+.dn { transition: stroke-dasharray .7s ease, stroke-dashoffset .7s ease; }
+.gg-h { transition: transform .9s cubic-bezier(.3, 1.25, .5, 1); }
+@media (prefers-reduced-motion: reduce) { .mb i, .br .fl, .xp-bar .seg, .dn, .gg-h { transition: none; } }

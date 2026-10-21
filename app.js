@@ -528,9 +528,9 @@
     if (hint) box.appendChild(el("p", { class: "hint", text: hint }));
     return box;
   }
-  function barRow(label, n, tot, color) {
+  function barRow(label, n, tot, color, key) {
     var p = tot ? Math.round((n / tot) * 100) : 0;
-    var fl = el("div", { class: "fl" }); fl.style.width = p + "%"; if (color) fl.style.background = "var(" + color + ")";
+    var fl = el("div", { class: "fl" }); grow(fl, "br:" + (key || "") + ":" + label, "width", p + "%", "0%"); if (color) fl.style.background = "var(" + color + ")";
     return el("div", { class: "br" }, [el("span", { text: label }), el("div", { class: "tr" }, [fl]), el("span", { class: "n", text: n + " (" + p + "%)" })]);
   }
   function moreToggle(box, key, total, limit) {
@@ -546,7 +546,7 @@
     var box = chart(title, (hint ? hint + " " : "") + "Base: " + t.tot + pl(t.tot, " resposta.", " respostas.") + smallBase(t.tot));
     if (!t.tot) { box.appendChild(el("p", { class: "hint", text: "Sem respostas neste filtro." })); return box; }
     var key = "bars:" + (opts.id || title), lim = opts.limit || 999;
-    t.items.slice(0, expanded[key] ? 9999 : lim).forEach(function (it, i) { box.appendChild(barRow(it.label, it.n, t.tot, opts.colors && opts.colors[i])); });
+    t.items.slice(0, expanded[key] ? 9999 : lim).forEach(function (it, i) { box.appendChild(barRow(it.label, it.n, t.tot, opts.colors && opts.colors[i], key)); });
     moreToggle(box, key, t.items.length, lim);
     return box;
   }
@@ -564,7 +564,7 @@
     var box = chart(title || "Recomendação (eNPS)", "Nota de 0 a 10 para recomendar a WAP como lugar para trabalhar. Detratores: 0 a 6. Neutros: 7 e 8. Promotores: 9 e 10. eNPS = % de promotores menos % de detratores.");
     if (!st.npsN) { box.appendChild(el("p", { class: "hint", text: "Sem notas neste filtro (a base 2024 não tinha esta pergunta)." })); return box; }
     box.appendChild(el("p", { class: "lead", text: "eNPS " + st.nps + " pontos, calculado sobre " + st.npsN + (st.npsN === 1 ? " nota." : " notas.") + smallBase(st.npsN) }));
-    [["Promotores (9 e 10)", st.pro, "--s1"], ["Neutros (7 e 8)", st.neu, "--s3"], ["Detratores (0 a 6)", st.det, "--s4"]].forEach(function (g) { box.appendChild(barRow(g[0], g[1], st.npsN, g[2])); });
+    [["Promotores (9 e 10)", st.pro, "--s1"], ["Neutros (7 e 8)", st.neu, "--s3"], ["Detratores (0 a 6)", st.det, "--s4"]].forEach(function (g) { box.appendChild(barRow(g[0], g[1], st.npsN, g[2], "nps")); });
     var notas = list.filter(function (x) { return isResp(x) && typeof x.nps === "number"; });
     // Distribuição por nota, com fundo leve por faixa (detrator, neutro, promotor)
     var cls = function (k) { return k <= 6 ? "nd" : k <= 8 ? "nn" : "npr"; };
@@ -602,7 +602,7 @@
         if (!n) return;
         var p = Math.round((n / d.n) * 100);
         var s = el("div", { class: "seg s" + (i + 1), title: ESCALA[i] + ": " + n + " de " + d.n + " (" + p + "%)" });
-        s.style.width = (n / d.n) * 100 + "%";
+        grow(s, "xp:" + d.key + ":" + i, "width", (n / d.n) * 100 + "%", "0%");
         if (p >= 14) s.textContent = n + " · " + p + "%"; else if (p >= 6) s.textContent = String(n);
         stack.appendChild(s);
       });
@@ -776,29 +776,54 @@
       sv("circle", { cx: last[0], cy: last[1], r: 3, class: "sp-d" })
     ]);
   }
+  // Gráficos "respondentes": ao mudar o número, o elemento desliza do valor anterior até o novo.
+  // Guarda o último valor de cada peça (pela chave) e aplica o novo no quadro seguinte, para a transição do CSS animar.
+  var prevViz = {};
+  function grow(node, key, prop, to, initial) {
+    var from = key in prevViz ? prevViz[key] : initial;
+    prevViz[key] = to;
+    if (from === undefined || from === to) { node.style[prop] = to; return; }
+    node.style[prop] = from;
+    requestAnimationFrame(function () { requestAnimationFrame(function () { node.style[prop] = to; }); });
+  }
   // Rosca: partes [{n, cls}]
-  function donut(parts) {
+  function donut(parts, key) {
     var tot = parts.reduce(function (a, p) { return a + p.n; }, 0) || 1, r = 15.915, off = 25, kids = [sv("circle", { cx: 21, cy: 21, r: r, class: "dn-bg" })];
+    key = key || "dn";
     parts.forEach(function (p) {
-      if (!p.n) return;
-      var len = (p.n / tot) * 100;
-      kids.push(sv("circle", { cx: 21, cy: 21, r: r, class: "dn " + p.cls, "stroke-dasharray": len + " " + (100 - len), "stroke-dashoffset": off }));
+      if (!p.n) { prevViz[key + p.cls + ":a"] = "0 100"; return; }
+      var len = (p.n / tot) * 100, c = sv("circle", { cx: 21, cy: 21, r: r, class: "dn " + p.cls });
+      grow(c, key + p.cls + ":a", "strokeDasharray", len + " " + (100 - len), "0 100");
+      grow(c, key + p.cls + ":o", "strokeDashoffset", String(off), "25");
+      kids.push(c);
       off -= len;
     });
     return svg(42, 42, kids);
   }
-  // Medidor de -100 a +100 para o eNPS.
+  // Medidor de -100 a +100 para o eNPS; o ponteiro gira até o valor e acompanha as mudanças.
   function gauge(v) {
-    var a = function (x) { var t = Math.PI * (1 - (x + 100) / 200); return [50 + 40 * Math.cos(t), 50 - 40 * Math.sin(t)]; };
-    var arc = function (x0, x1, cls) { var p0 = a(x0), p1 = a(x1); return sv("path", { d: "M" + p0[0] + " " + p0[1] + " A40 40 0 0 1 " + p1[0] + " " + p1[1], class: "gg " + cls }); };
-    var kids = [arc(-100, 0, "gg-d"), arc(0, 50, "gg-n"), arc(50, 100, "gg-p")];
-    if (v !== null) { var p = a(Math.max(-100, Math.min(100, v))); kids.push(sv("line", { x1: 50, y1: 50, x2: p[0], y2: p[1], class: "gg-h" }), sv("circle", { cx: 50, cy: 50, r: 4, class: "gg-c" })); }
-    return svg(100, 56, kids);
+    var cx = 60, cy = 62, R = 48;
+    var a = function (x) { var t = Math.PI * (1 - (x + 100) / 200); return [cx + R * Math.cos(t), cy - R * Math.sin(t)]; };
+    var arc = function (x0, x1, cls) { var p0 = a(x0), p1 = a(x1); return sv("path", { d: "M" + p0[0] + " " + p0[1] + " A" + R + " " + R + " 0 0 1 " + p1[0] + " " + p1[1], class: "gg " + cls }); };
+    var t = function (x, y, s, anchor) { var n = sv("text", { x: x, y: y, class: "gg-t", "text-anchor": anchor }); n.textContent = s; return n; };
+    var kids = [arc(-100, 0, "gg-d"), arc(0, 50, "gg-n"), arc(50, 100, "gg-p"), t(cx - R, cy + 12, "−100", "middle"), t(cx, 8, "0", "middle"), t(cx + R, cy + 12, "+100", "middle")];
+    if (v !== null) {
+      var needle = sv("line", { x1: cx, y1: cy, x2: cx, y2: cy - R + 6, class: "gg-h" });
+      grow(needle, "gauge", "transform", "rotate(" + (Math.max(-100, Math.min(100, v)) * 0.9) + "deg)", "rotate(-90deg)");
+      kids.push(needle, sv("circle", { cx: cx, cy: cy, r: 5, class: "gg-c" }));
+    }
+    var s = svg(120, 76, kids); s.setAttribute("class", "gauge"); return s;
   }
   // Barrinha empilhada para os cartões: partes [{n, cls, label}]
-  function minibar(parts) {
+  function minibar(parts, key) {
     var tot = parts.reduce(function (a, p) { return a + p.n; }, 0), b = el("div", { class: "mb" });
-    parts.forEach(function (p) { if (!p.n) return; var s = el("i", { class: p.cls, title: p.label + ": " + np(p.n, tot) }); s.style.width = (p.n / tot) * 100 + "%"; b.appendChild(s); });
+    key = key || "mb:" + parts.map(function (p) { return p.label; }).join("|");
+    parts.forEach(function (p) {
+      if (!p.n) { prevViz[key + ":" + p.label] = "0%"; return; }
+      var s = el("i", { class: p.cls, title: p.label + ": " + np(p.n, tot) });
+      grow(s, key + ":" + p.label, "width", (p.n / tot) * 100 + "%", "0%");
+      b.appendChild(s);
+    });
     return b;
   }
   function legendRow(parts) {
