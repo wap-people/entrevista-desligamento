@@ -44,7 +44,7 @@ Abra `http://localhost:8000/?demo=1` para o **modo demonstração**: pula o logi
 
 ## Operação
 
-- **Keep-alive**: o plano gratuito do Supabase pausa após 7 dias sem uso. O workflow `.github/workflows/supabase-keepalive.yml` faz uma consulta leve a cada 3 dias. Se o projeto pausar, entre no painel e clique em *Resume project*.
+- **Keep-alive**: o plano gratuito do Supabase pausa após 7 dias sem uso. O workflow `.github/workflows/supabase-keepalive.yml` faz uma consulta leve todo dia e se reativa sozinho, para o GitHub não desligá-lo após 60 dias sem commits. Se falhar, o GitHub manda e-mail para quem alterou o workflow por último. Se o projeto pausar mesmo assim, entre no painel e clique em *Resume project* (os dados não se perdem).
 - **Backup**: no Supabase, **Table Editor > entrevistas > Export to CSV**, ou o botão **Baixar Excel** do site.
 
 ## Segurança e privacidade

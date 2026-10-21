@@ -1,14 +1,26 @@
 # Evita que o Supabase (plano gratuito) pause o projeto por inatividade.
-# O plano free pausa após 7 dias sem uso; isto faz uma consulta leve a cada 3 dias.
-# Usa a URL e a chave anon PÚBLICAS do config.js (a mesma que o site usa) e chama a
-# função public.ping(), que não lê nenhuma tabela.
+# O plano free pausa após 7 dias sem uso; isto faz uma consulta leve TODO DIA (folga para falhas).
+# Usa a URL e a chave PÚBLICA do config.js (a mesma que o site usa) e chama a função
+# public.ping(), que não lê nenhuma tabela.
+#
+# O GitHub desativa workflows agendados de repositórios públicos após 60 dias sem commits.
+# Por isso, a cada execução, o próprio workflow se reativa pela API (sem criar commits).
+#
+# Se falhar, o GitHub manda e-mail para quem alterou este arquivo por último.
 # Também pode ser rodado à mão: GitHub > Actions > "Supabase keep-alive" > Run workflow.
 name: Supabase keep-alive
 
 on:
   schedule:
-    - cron: '17 11 */3 * *'   # a cada 3 dias, 08:17 (horário de Brasília)
+    - cron: '17 11 * * *'   # todo dia, 08:17 (horário de Brasília)
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/supabase-keepalive.yml', 'config.js']
+
+permissions:
+  contents: read
+  actions: write
 
 jobs:
   ping:
@@ -23,12 +35,18 @@ jobs:
         run: |
           URL=$(grep -o "SUPABASE_URL: *'[^']*'" config.js | sed "s/.*'\(.*\)'/\1/")
           KEY=$(grep -o "SUPABASE_ANON_KEY: *'[^']*'" config.js | sed "s/.*'\(.*\)'/\1/")
-          for i in 1 2 3; do
-            CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$URL/rest/v1/rpc/ping" \
-              -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{}')
-            echo "Tentativa $i: HTTP $CODE"
+          for i in 1 2 3 4 5; do
+            BODY=$(curl -s -w "\n%{http_code}" -X POST "$URL/rest/v1/rpc/ping" \
+              -H "apikey: $KEY" -H "Content-Type: application/json" -d '{}')
+            CODE=$(echo "$BODY" | tail -n1)
+            echo "Tentativa $i: HTTP $CODE $(echo "$BODY" | head -n1)"
             if [ "$CODE" = "200" ]; then exit 0; fi
-            sleep 20
+            sleep 30
           done
           echo "::error::O Supabase não respondeu (HTTP $CODE). O projeto pode estar pausado: entre no painel do Supabase e clique em Resume project."
           exit 1
+      - name: Manter este workflow ativo (regra dos 60 dias do GitHub)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/supabase-keepalive.yml/enable"
