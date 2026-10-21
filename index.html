@@ -7,7 +7,7 @@
 <title>Entrevista de Desligamento V2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap">
-<link rel="stylesheet" href="styles.css?v=5">
+<link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
 
@@ -61,22 +61,27 @@
   </section>
 
   <section id="p-ind" role="tabpanel" aria-labelledby="tab-ind" hidden>
-    <div class="filters">
-      <label for="ft">TIPO DE SAÍDA<select id="ft">
-        <option value="">Todas</option>
-        <option value="vol">Voluntárias</option>
-        <option value="inv">Involuntárias</option>
-        <option value="sem">Sem iniciativa registrada</option>
-      </select></label>
-      <label for="fu">UNIDADE<select id="fu"></select></label>
-      <label for="fo">ORIGEM<select id="fo">
-        <option value="">V2 e base 2024</option>
-        <option value="V2">Só V2</option>
-        <option value="Base 2024">Só base 2024</option>
-      </select></label>
-      <div id="fms" class="row" style="align-items:flex-end;gap:12px 20px"></div>
+    <div class="ind-top">
+      <div class="seg" id="ftseg" role="radiogroup" aria-label="Tipo de saída">
+        <button type="button" role="radio" data-t="" aria-checked="true">Todas</button>
+        <button type="button" role="radio" data-t="vol" aria-checked="false">Voluntárias</button>
+        <button type="button" role="radio" data-t="inv" aria-checked="false">Involuntárias</button>
+        <button type="button" role="radio" data-t="sem" aria-checked="false">Sem iniciativa</button>
+      </div>
+      <details class="fpanel" id="fpanel">
+        <summary><span class="fp-t">Filtros</span><span id="fchips" class="fchips"></span></summary>
+        <div class="filters">
+          <label for="fu">UNIDADE<select id="fu"></select></label>
+          <label for="fo">ORIGEM<select id="fo">
+            <option value="">V2 e base 2024</option>
+            <option value="V2">Só V2</option>
+            <option value="Base 2024">Só base 2024</option>
+          </select></label>
+          <div id="fms" class="row" style="align-items:flex-end;gap:12px 20px"></div>
+        </div>
+        <div class="fp-foot"><button class="lnk" id="fclear" type="button">Limpar filtros</button></div>
+      </details>
     </div>
-    <p class="hint" style="margin-top:12px">A base 2024 não tinha nota de recomendação (eNPS) nem clima da empresa e equilíbrio. Feedback e desenvolvimento foram convertidos de forma aproximada.</p>
     <div id="ind-main"></div>
   </section>
 
@@ -120,6 +125,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="config.js?v=2"></script>
-<script src="app.js?v=7"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>
