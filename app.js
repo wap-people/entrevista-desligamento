@@ -64,13 +64,15 @@
   ];
 
   var COLS = [
-    ["data", "Data"], ["criadoEm", "Registrado em"], ["entrevistador", "Entrevistador"], ["unidade", "Unidade"], ["colaborador", "Colaborador"], ["setor", "Setor"], ["gestor", "Gestor direto"],
+    ["data", "Data"], ["criadoEm", "Registrado em"], ["origem", "Origem"], ["entrevistador", "Entrevistador"], ["unidade", "Unidade"], ["colaborador", "Colaborador"], ["setor", "Setor"], ["gestor", "Gestor direto"],
     ["iniciativa", "Iniciativa do desligamento"], ["aceitou", "Aceitou participar"], ["principalFator", "Principal fator da saída"], ["secundarios", "Fatores secundários"],
     ["motivoInvoluntario", "Motivo do desligamento involuntário"], ["climaArea", "Clima na grande área"], ["climaEmpresa", "Clima na empresa"],
     ["gestorRel", "Relacionamento com o gestor"], ["feedback", "Feedback nos últimos 6 meses"], ["salario", "Salário"], ["beneficios", "Benefícios"],
     ["desenvolvimento", "Desenvolvimento e crescimento"], ["equilibrio", "Equilíbrio vida pessoal e profissional"], ["voltaria", "Voltaria a trabalhar na WAP"],
-    ["nps", "Recomendação (0 a 10)"], ["mudaria", "O que mudaria"], ["obs", "Observações gerais do entrevistador"]
+    ["nps", "Recomendação (0 a 10)"], ["mudaria", "O que mudaria"], ["legado", "Respostas da base 2024"], ["obs", "Observações gerais do entrevistador"]
   ];
+  // Respostas que só existiam no formulário antigo (jsonb { rótulo: resposta }).
+  function legadoTxt(v, sep) { return Object.keys(v || {}).map(function (k) { return k + ": " + v[k]; }).join(sep); }
   var DIM = [["climaArea", "Clima na grande área"], ["climaEmpresa", "Clima na empresa"], ["gestorRel", "Relacionamento com o gestor"], ["salario", "Salário"], ["beneficios", "Benefícios"], ["desenvolvimento", "Desenvolvimento e crescimento"], ["equilibrio", "Equilíbrio vida e trabalho"]];
 
   var $ = function (s) { return document.querySelector(s); };
@@ -315,16 +317,17 @@
   UNIDADES.forEach(function (u) { fu.appendChild(el("option", { value: u, text: u })); });
   fu.addEventListener("change", renderAll);
   $("#fp").addEventListener("change", renderAll);
+  $("#fo").addEventListener("change", renderAll);
 
   function pct(a, b) { return b ? Math.round((a / b) * 100) : null; }
   function fmt(v, suf) { return v === null || v === undefined ? "-" : v + (suf || ""); }
   function entryDate(x) { return x.data || (x.criadoEm || "").slice(0, 10); }
 
   function filtered() {
-    var u = fu.value, days = Number($("#fp").value);
+    var u = fu.value, days = Number($("#fp").value), o = $("#fo").value;
     var cut = null;
     if (days) { var d = new Date(); d.setDate(d.getDate() - days); cut = d.toISOString().slice(0, 10); }
-    return entries.filter(function (x) { return (!u || x.unidade === u) && (!cut || entryDate(x) >= cut); });
+    return entries.filter(function (x) { return (!u || x.unidade === u) && (!cut || entryDate(x) >= cut) && (!o || (x.origem || "V2") === o); });
   }
   function stats(list) {
     var resp = list.filter(function (x) { return x.aceitou === "Sim"; });
@@ -332,10 +335,11 @@
     var pro = nps.filter(function (x) { return x.nps >= 9; }).length;
     var det = nps.filter(function (x) { return x.nps <= 6; }).length;
     var volt = resp.filter(function (x) { return x.voltaria; });
+    var inic = list.filter(function (x) { return x.iniciativa; }); // base 2024 tem recusas sem iniciativa
     return {
       n: list.length, resp: resp,
       adesao: pct(resp.length, list.length),
-      vol: pct(list.filter(function (x) { return x.iniciativa === INIC[0]; }).length, list.length),
+      vol: pct(inic.filter(function (x) { return x.iniciativa === INIC[0]; }).length, inic.length),
       nps: nps.length ? Math.round(((pro - det) / nps.length) * 100) : null,
       pro: pro, det: det, neu: nps.length - pro - det, npsN: nps.length,
       volta: pct(volt.filter(function (x) { return x.voltaria === "Sim"; }).length, volt.length)
@@ -424,7 +428,7 @@
     host.appendChild(bars("Feedback do gestor nos últimos 6 meses", null, resp, "feedback", FEEDBACK));
 
     var tb = el("tbody");
-    UNIDADES.forEach(function (u) {
+    UNIDADES.concat(["Não informada"]).forEach(function (u) {
       var l = list.filter(function (x) { return x.unidade === u; });
       if (!l.length) return;
       var s = stats(l);
@@ -496,8 +500,10 @@
         });
         acts.push(del);
       }
+      var dt = el("td", { text: brDate(entryDate(x)) });
+      if (x.origem === "Base 2024") dt.appendChild(el("span", { class: "tag", text: "2024" }));
       tb.appendChild(el("tr", null, [
-        el("td", { text: brDate(entryDate(x)) }), el("td", { text: x.colaborador || "" }), el("td", { text: x.unidade || "" }),
+        dt, el("td", { text: x.colaborador || "" }), el("td", { text: x.unidade || "" }),
         el("td", { text: x.iniciativa || "" }), el("td", { text: x.aceitou === "Sim" ? (typeof x.nps === "number" ? "Nota " + x.nps : "Respondeu") : "Recusou" }),
         el("td", { class: "act" }, acts)
       ]));
@@ -507,6 +513,7 @@
           var v = x[c[0]]; if (v === undefined || v === "") return;
           if (c[0] === "data") v = brDate(v);
           if (c[0] === "criadoEm") v = brDateTime(v);
+          if (c[0] === "legado") v = legadoTxt(v, "\n");
           dl.appendChild(el("dt", { text: c[1] })); dl.appendChild(el("dd", { text: String(v) }));
         });
         if (x.criadoPor && memberNames[x.criadoPor]) { dl.appendChild(el("dt", { text: "Registrado por" })); dl.appendChild(el("dd", { text: memberNames[x.criadoPor] })); }
@@ -543,6 +550,7 @@
         if (v === undefined) return "";
         if (c[0] === "data") return brDate(v);
         if (c[0] === "criadoEm") return brDateTime(v);
+        if (c[0] === "legado") return legadoTxt(v, " | ");
         return v;
       }).concat([typeof x.nps === "number" ? (x.nps >= 9 ? "Promotor" : x.nps >= 7 ? "Neutro" : "Detrator") : ""]));
     });
