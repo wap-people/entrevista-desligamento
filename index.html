@@ -7,7 +7,7 @@
 <title>Entrevista de Desligamento V2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap">
-<link rel="stylesheet" href="styles.css?v=3">
+<link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
 
@@ -62,13 +62,13 @@
 
   <section id="p-ind" role="tabpanel" aria-labelledby="tab-ind" hidden>
     <div class="filters">
-      <label for="fu">UNIDADE<select id="fu"></select></label>
-      <label for="fp">PERÍODO<select id="fp">
-        <option value="0">Todo o período</option>
-        <option value="30">Últimos 30 dias</option>
-        <option value="90">Últimos 90 dias</option>
-        <option value="365">Últimos 12 meses</option>
+      <label for="ft">TIPO DE SAÍDA<select id="ft">
+        <option value="">Todas</option>
+        <option value="vol">Voluntárias</option>
+        <option value="inv">Involuntárias</option>
+        <option value="sem">Sem iniciativa registrada</option>
       </select></label>
+      <label for="fu">UNIDADE<select id="fu"></select></label>
       <label for="fo">ORIGEM<select id="fo">
         <option value="">V2 e base 2024</option>
         <option value="V2">Só V2</option>
@@ -120,6 +120,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="config.js?v=2"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

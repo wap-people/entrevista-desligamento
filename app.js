@@ -344,7 +344,7 @@
   fu.appendChild(el("option", { value: "", text: "Todas as unidades" }));
   UNIDADES.forEach(function (u) { fu.appendChild(el("option", { value: u, text: u })); });
   fu.addEventListener("change", renderAll);
-  $("#fp").addEventListener("change", renderAll);
+  $("#ft").addEventListener("change", renderAll);
   $("#fo").addEventListener("change", renderAll);
 
   // Chave para agrupar nomes digitados de jeitos diferentes ("JOÃO SILVA", "Joao  Silva").
@@ -356,7 +356,10 @@
   }
 
   // Filtro de seleção múltipla com busca. Nada marcado = todos.
-  function multiSelect(host, title, field, plural) {
+  // field: nome do campo ou função; o.format: rótulo a partir do valor; o.newest: ordem decrescente (meses).
+  function multiSelect(host, title, field, plural, o) {
+    o = o || {};
+    var get = typeof field === "function" ? field : function (x) { return x[field]; };
     var sel = {}, opts = [];
     var summary = el("summary", { text: "Todos" });
     var search = el("input", { type: "search", placeholder: "Buscar", "aria-label": "Buscar " + plural });
@@ -399,31 +402,38 @@
       refresh: function (rows) {
         var g = {};
         rows.forEach(function (x) {
-          var v = x[field]; if (!v) return;
-          var k = fold(v); g[k] = g[k] || { key: k, n: 0, names: {} };
+          var v = get(x); if (!v) return;
+          var k = fold(v); if (o.format) v = o.format(v); g[k] = g[k] || { key: k, n: 0, names: {} };
           g[k].n++; g[k].names[v] = (g[k].names[v] || 0) + 1;
         });
         opts = Object.keys(g).map(function (k) {
           return { key: k, n: g[k].n, label: bestName(g[k].names) };
-        }).sort(function (a, b) { return a.label.localeCompare(b.label, "pt-BR"); });
+        }).sort(o.newest ? function (a, b) { return a.key < b.key ? 1 : -1; } : function (a, b) { return a.label.localeCompare(b.label, "pt-BR"); });
         Object.keys(sel).forEach(function (k) { if (!g[k]) delete sel[k]; });
         summary.textContent = label(); draw();
       },
-      test: function (x) { return !count() || !!sel[fold(x[field])]; }
+      test: function (x) { return !count() || !!sel[fold(get(x))]; }
     };
   }
+  var MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  var fMes = multiSelect($("#fms"), "MÊS", function (x) { return entryDate(x).slice(0, 7); }, "meses",
+    { newest: 1, format: function (m) { return MESES[Number(m.slice(5, 7)) - 1] + "/" + m.slice(0, 4); } });
   var fGestor = multiSelect($("#fms"), "GESTOR", "gestor", "gestores");
   var fSetor = multiSelect($("#fms"), "ÁREA", "setor", "áreas");
+  var fEntrev = multiSelect($("#fms"), "ENTREVISTADOR", "entrevistador", "entrevistadores");
+  var FILTROS = [fMes, fGestor, fSetor, fEntrev];
 
   function pct(a, b) { return b ? Math.round((a / b) * 100) : null; }
   function fmt(v, suf) { return v === null || v === undefined ? "-" : v + (suf || ""); }
   function entryDate(x) { return x.data || (x.criadoEm || "").slice(0, 10); }
 
-  function filtered() {
-    var u = fu.value, days = Number($("#fp").value), o = $("#fo").value;
-    var cut = null;
-    if (days) { var d = new Date(); d.setDate(d.getDate() - days); cut = d.toISOString().slice(0, 10); }
-    return entries.filter(function (x) { return (!u || x.unidade === u) && (!cut || entryDate(x) >= cut) && (!o || (x.origem || "V2") === o) && fGestor.test(x) && fSetor.test(x); });
+  // skipTipo: mesmo recorte sem o tipo de saída (base do "% do total")
+  function filtered(skipTipo) {
+    var u = fu.value, o = $("#fo").value, t = skipTipo ? "" : $("#ft").value;
+    var tipo = { vol: function (x) { return x.iniciativa === INIC[0]; }, inv: function (x) { return x.iniciativa === INIC[1]; }, sem: function (x) { return !x.iniciativa; } }[t];
+    return entries.filter(function (x) {
+      return (!u || x.unidade === u) && (!o || (x.origem || "V2") === o) && (!tipo || tipo(x)) && FILTROS.every(function (f) { return f.test(x); });
+    });
   }
   /* ---------- Indicadores: contas ---------- */
   var isVol = function (x) { return x.iniciativa === INIC[0]; };
@@ -504,7 +514,7 @@
     return box;
   }
   function tile(v, label, sub) { return el("div", { class: "tile" }, [el("b", { text: v }), el("span", { text: label }), sub ? el("small", { text: sub }) : null]); }
-  function story(text) { return el("p", { class: "story", text: text }); }
+
   function heading(title, color) { var h = el("h2", { class: "sec", text: title }); h.style.setProperty("--c", "var(" + color + ")"); return h; }
   function table(head, rows, numFrom) {
     var th = head.map(function (h, i) { return el("th", { class: i >= numFrom ? "num" : "", text: h }); });
@@ -519,10 +529,19 @@
     box.appendChild(el("p", { class: "lead", text: "eNPS " + st.nps + " pontos, calculado sobre " + st.npsN + (st.npsN === 1 ? " nota." : " notas.") }));
     [["Promotores (9 e 10)", st.pro, "--s1"], ["Neutros (7 e 8)", st.neu, "--s3"], ["Detratores (0 a 6)", st.det, "--s4"]].forEach(function (g) { box.appendChild(barRow(g[0], g[1], st.npsN, g[2])); });
     var notas = list.filter(function (x) { return isResp(x) && typeof x.nps === "number"; });
-    var row = [];
-    for (var k = 0; k <= 10; k++) { var n = notas.filter(function (x) { return x.nps === k; }).length; row.push(np(n, notas.length)); }
+    // Distribuição por nota, com fundo leve por faixa (detrator, neutro, promotor)
+    var cls = function (k) { return k <= 6 ? "nd" : k <= 8 ? "nn" : "npr"; };
+    var hr = el("tr"), br = el("tr");
+    for (var k = 0; k <= 10; k++) {
+      var n = notas.filter(function (x) { return x.nps === k; }).length;
+      hr.appendChild(el("th", { class: "num " + cls(k), text: String(k) }));
+      br.appendChild(el("td", { class: "num " + cls(k), text: np(n, notas.length) }));
+    }
     box.appendChild(el("p", { class: "hint", text: "Distribuição por nota", style: "margin:16px 0 0" }));
-    box.appendChild(table(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"], [row], 0));
+    var lg = el("div", { class: "legend" });
+    [["nd", "Detratores (0 a 6)"], ["nn", "Neutros (7 e 8)"], ["npr", "Promotores (9 e 10)"]].forEach(function (g) { lg.appendChild(el("span", null, [el("i", { class: g[0] }), document.createTextNode(g[1])])); });
+    box.appendChild(lg);
+    box.appendChild(el("div", { class: "tw" }, [el("table", { class: "nps-t" }, [el("thead", null, [hr]), el("tbody", null, [br])])]));
     return box;
   }
 
@@ -564,47 +583,48 @@
     return [extra, x.setor, x.unidade, brDate(entryDate(x)), typeof x.nps === "number" ? "nota " + x.nps + " (" + npsClass(x.nps) + ")" : "", x.origem === "Base 2024" ? "base 2024" : ""].filter(Boolean).join(" · ");
   }
 
-  // Bloco de um grupo de saídas (voluntárias ou involuntárias): números, todas as perguntas e o que dizem.
-  function groupBlock(kind, list, all) {
-    var vol = kind === "vol", st = stats(list), wrap = el("div");
-    wrap.appendChild(heading(vol ? "Saídas voluntárias" : "Saídas involuntárias", vol ? "--p4" : "--p2"));
-    if (!list.length) { wrap.appendChild(el("p", { class: "hint", text: "Nenhuma saída deste tipo no filtro." })); return wrap; }
-    var resp = st.resp, recusas = st.n - st.nResp;
-    var topKey = vol ? "principalFator" : "motivoInvoluntario";
-    var topBase = vol ? resp : list, top = tally(topBase, field(topKey)).items[0], topTot = tally(topBase, field(topKey)).tot;
-    var s = (vol ? "Foram " + np(st.n, all.n) + " saídas por iniciativa do colaborador. " : "Foram " + np(st.n, all.n) + " desligamentos por iniciativa da empresa. ");
-    if (top) s += (vol ? "O principal fator citado foi " : "O motivo mais registrado foi ") + "“" + top.label + "”" + (top.label === "Outro" ? " (textos variados, listados abaixo)" : "") + ", em " + nOf(top.n, topTot) + (vol ? " de quem respondeu. " : " dos casos com motivo. ");
-    s += nOf(st.nResp, st.n) + " aceitaram participar da entrevista e " + recusas + " recusaram.";
-    if (st.npsN) s += " eNPS " + st.nps + " (" + st.pro + " promotores, " + st.neu + " neutros, " + st.det + " detratores).";
-    if (st.voltaN) s += " " + nOf(st.voltaSim, st.voltaN) + " voltariam a trabalhar na WAP.";
-    wrap.appendChild(story(s));
-    wrap.appendChild(el("div", { class: "tiles" }, [
-      tile(String(st.n), vol ? "saídas voluntárias" : "saídas involuntárias", np(st.n, all.n) + " do total"),
-      tile(fmt(st.adesao, "%"), "aceitaram a entrevista", nOf(st.nResp, st.n)),
-      tile(fmt(st.nps), "eNPS", st.npsN ? st.npsN + " notas" : "sem notas"),
-      tile(fmt(st.volta, "%"), "voltariam", st.voltaN ? nOf(st.voltaSim, st.voltaN) : "sem respostas")
-    ]));
-    if (vol) wrap.appendChild(bars("Principal fator da saída", "Quem pediu para sair e respondeu.", resp, field("principalFator"), { id: "fator" }));
-    else wrap.appendChild(bars("Motivo do desligamento involuntário", "Todos os desligamentos por iniciativa da empresa, mesmo com recusa da entrevista.", list, field("motivoInvoluntario"), { id: "motivo" }));
-    // O que foi escrito em cada "Outro", para não esconder o contexto atrás da categoria
-    var outros = (vol ? resp : list).filter(function (x) { return String(x[topKey] || "").indexOf("Outro: ") === 0; })
-      .map(function (x) { var o = Object.assign({}, x); o._o = x[topKey].slice(7); return o; });
-    wrap.appendChild(quotes(vol ? "Fatores descritos como “Outro”" : "Motivos descritos como “Outro”", null, outros, "_o", function (x) { return ctx(x, ""); }));
-    wrap.appendChild(bars("Aceitou participar da entrevista?", null, list, field("aceitou"), { id: kind + "aceitou", order: SN, colors: ["--s1", "--s4"] }));
+  // Perguntas do formulário, aplicadas ao recorte do filtro (todas, voluntárias ou involuntárias).
+  function questions(list) {
+    var st = stats(list), resp = st.resp, wrap = el("div");
+    if (list.some(isVol)) wrap.appendChild(bars("Principal fator da saída voluntária", "Quem pediu para sair e aceitou a entrevista.", resp.filter(isVol), field("principalFator"), { id: "fator" }));
+    if (list.some(isInv)) wrap.appendChild(bars("Motivo do desligamento involuntário", "Todos os desligamentos por iniciativa da empresa, mesmo com recusa da entrevista.", list.filter(isInv), field("motivoInvoluntario"), { id: "motivo" }));
+    wrap.appendChild(bars("Aceitou participar da entrevista?", null, list, field("aceitou"), { id: "aceitou", order: SN, colors: ["--s1", "--s4"] }));
     wrap.appendChild(npsBlock(st, list));
     wrap.appendChild(expTable(resp));
-    wrap.appendChild(bars("Feedback do gestor nos últimos 6 meses", "Na base 2024 a pergunta era “recebeu feedbacks no período?” (Nunca / Às vezes / Sempre), convertida de forma aproximada.", resp, field("feedback"), { id: kind + "fb", order: FEEDBACK }));
-    wrap.appendChild(bars("Voltaria a trabalhar na WAP?", null, resp, field("voltaria"), { id: kind + "volta", order: SN, colors: ["--s1", "--s4"] }));
-    wrap.appendChild(bars("Benefício que mais atendia", "Resposta aberta; respostas iguais escritas de jeitos diferentes contam juntas.", resp, field("beneficioMelhor"), { id: kind + "bm", limit: 8 }));
-    wrap.appendChild(bars("Benefício com maior oportunidade de melhoria", "Resposta aberta; respostas iguais escritas de jeitos diferentes contam juntas.", resp, field("beneficioMelhoria"), { id: kind + "bo", limit: 8 }));
+    wrap.appendChild(bars("Feedback do gestor nos últimos 6 meses", "Na base 2024 a pergunta era “recebeu feedbacks no período?” (Nunca / Às vezes / Sempre), convertida de forma aproximada.", resp, field("feedback"), { id: "fb", order: FEEDBACK }));
+    wrap.appendChild(bars("Voltaria a trabalhar na WAP?", null, resp, field("voltaria"), { id: "volta", order: SN, colors: ["--s1", "--s4"] }));
+    wrap.appendChild(bars("Benefício que mais atendia", "Resposta aberta; respostas iguais escritas de jeitos diferentes contam juntas.", resp, field("beneficioMelhor"), { id: "bm", limit: 8 }));
+    wrap.appendChild(bars("Benefício com maior oportunidade de melhoria", "Resposta aberta; respostas iguais escritas de jeitos diferentes contam juntas.", resp, field("beneficioMelhoria"), { id: "bo", limit: 8 }));
+    return wrap;
+  }
 
-    wrap.appendChild(el("h3", { class: "sub-h", text: vol ? "O que os voluntários estão dizendo" : "O que os involuntários estão dizendo" }));
-    var why = function (x) { return vol ? (x.principalFator || "") : (x.motivoInvoluntario || ""); };
-    if (vol) wrap.appendChild(quotes("Fatores secundários da saída", null, resp, "secundarios", function (x) { return ctx(x, why(x)); }));
+  // O que dizem: comentários completos, com o motivo ou fator de cada pessoa ao lado.
+  function why(x) { return isVol(x) ? "voluntária · " + (x.principalFator || "sem fator") : isInv(x) ? "involuntária · " + (x.motivoInvoluntario || "sem motivo") : "sem iniciativa"; }
+  function sayings(list) {
+    var resp = list.filter(isResp), wrap = el("div");
+    var outro = function (key) {
+      return list.filter(function (x) { return String(x[key] || "").indexOf("Outro: ") === 0; }).map(function (x) { var o = Object.assign({}, x); o._o = x[key].slice(7); return o; });
+    };
+    if (list.some(isVol)) wrap.appendChild(quotes("Fatores descritos como “Outro”", null, outro("principalFator"), "_o", function (x) { return ctx(x, ""); }));
+    if (list.some(isInv)) wrap.appendChild(quotes("Motivos descritos como “Outro”", null, outro("motivoInvoluntario"), "_o", function (x) { return ctx(x, ""); }));
+    if (list.some(isVol)) wrap.appendChild(quotes("Fatores secundários da saída", null, resp.filter(isVol), "secundarios", function (x) { return ctx(x, why(x)); }));
     wrap.appendChild(quotes("O que mudaria na WAP", "“Se pudesse mudar uma coisa na WAP para melhorar a experiência dos colaboradores, o que mudaria?”", resp, "mudaria", function (x) { return ctx(x, why(x)); }));
-    wrap.appendChild(quotes("Benefício a melhorar (comentários)", null, resp, "beneficioMelhoria", function (x) { return ctx(x, why(x)); }));
+    wrap.appendChild(quotes("Benefício a melhorar", null, resp, "beneficioMelhoria", function (x) { return ctx(x, why(x)); }));
     wrap.appendChild(quotes("Observações do entrevistador", "Registro de quem conduziu a entrevista. Pode citar pessoas.", list, "obs", function (x) { return ctx(x, why(x)); }));
     return wrap;
+  }
+  function commentCount(list) {
+    var n = 0, resp = list.filter(isResp);
+    ["mudaria", "beneficioMelhoria", "secundarios"].forEach(function (k) { n += resp.filter(function (x) { return x[k]; }).length; });
+    return n + list.filter(function (x) { return x.obs; }).length;
+  }
+
+  // Seção recolhível: abre ao clicar e continua aberta ao trocar filtros.
+  function collapsible(id, title, sub, content) {
+    var d = el("details", { class: "fold" }, [el("summary", null, [el("span", { text: title }), sub ? el("small", { text: sub }) : null]), el("div", { class: "fold-b" }, [content])]);
+    if (expanded["sec:" + id]) d.open = true;
+    d.addEventListener("toggle", function () { expanded["sec:" + id] = d.open; });
+    return d;
   }
 
   // Tabela de quebra (unidade, área, gestor...): saídas, voluntárias, involuntárias, aceitaram, eNPS, voltariam.
@@ -649,74 +669,107 @@
     ["Principal oportunidade de melhoria (categoria)", null],
     ["Defina a WAP em uma palavra", null]
   ];
-  function legacyBlock(list) {
-    var old = list.filter(function (x) { return x.origem === "Base 2024"; });
+  function legacyBlock(old) {
     var wrap = el("div");
-    if (!old.length) return wrap;
-    wrap.appendChild(heading("Perguntas da base 2024", "--p3"));
-    wrap.appendChild(story("Perguntas que existiam só no formulário antigo. Valem para as " + old.length + " entrevistas da base 2024 neste filtro e não têm equivalente no V2."));
+    wrap.appendChild(el("p", { class: "hint", text: "Perguntas que existiam só no formulário antigo. Valem para as " + old.length + " entrevistas da base 2024 neste filtro e não têm equivalente no V2." }));
     LEG_CAT.forEach(function (q) {
       wrap.appendChild(bars(q[0], q[1] ? null : "Respostas iguais escritas de jeitos diferentes contam juntas.", old, legacy(q[0]), { id: "leg:" + q[0], order: q[1] || null, limit: q[1] ? 0 : 10 }));
     });
     var conselho = old.filter(function (x) { return x.legado && x.legado["Conselho para quem vai ocupar a posição"]; })
       .map(function (x) { var o = Object.assign({}, x); o._c = x.legado["Conselho para quem vai ocupar a posição"]; return o; });
-    wrap.appendChild(quotes("Conselho para quem vai ocupar a posição", null, conselho, "_c", function (x) { return ctx(x, isVol(x) ? "voluntária" : isInv(x) ? "involuntária" : ""); }));
+    wrap.appendChild(quotes("Conselho para quem vai ocupar a posição", null, conselho, "_c", function (x) { return ctx(x, why(x)); }));
     return wrap;
   }
 
+  // Resumo em cartão: uma frase principal e os detalhes em tópicos, números em destaque.
+  // Partes: texto simples ou [texto] para destacar.
+  function rich(parts) { var p = el("span"); parts.forEach(function (t) { p.appendChild(Array.isArray(t) ? el("b", { text: t[0] }) : document.createTextNode(t)); }); return p; }
+  function insight(color, label, lead, points) {
+    var card = el("div", { class: "insight" }, [el("span", { class: "insight-l", text: label }), el("p", { class: "insight-lead" }, [rich(lead)])]);
+    card.style.setProperty("--c", "var(" + color + ")");
+    var ul = el("ul"); points.filter(Boolean).forEach(function (pt) { ul.appendChild(el("li", null, [rich(pt)])); });
+    if (ul.childNodes.length) card.appendChild(ul);
+    return card;
+  }
+  // Melhor e pior dimensão da experiência no recorte.
+  function extremes(resp) {
+    var r = DIM.map(function (d) { var a = answered(resp, d[0]); return { label: d[1], n: a.length, g: goodN(a, d[0]), p: pct(goodN(a, d[0]), a.length) }; }).filter(function (x) { return x.n; });
+    if (r.length < 2) return null;
+    r.sort(function (a, b) { return b.p - a.p; });
+    return { best: r[0], worst: r[r.length - 1] };
+  }
+
   /* ---------- Indicadores: a história ---------- */
+  var TIPOS = {
+    "": { titulo: "Visão geral", cor: "--p1", rotulo: "Resumo de todas as saídas" },
+    vol: { titulo: "Saídas voluntárias", cor: "--p4", rotulo: "Resumo das saídas voluntárias" },
+    inv: { titulo: "Saídas involuntárias", cor: "--p2", rotulo: "Resumo das saídas involuntárias" },
+    sem: { titulo: "Sem iniciativa registrada", cor: "--p3", rotulo: "Resumo" }
+  };
   function renderMain(list) {
     var host = $("#ind-main"); host.textContent = "";
     if (!entries.length) { host.appendChild(el("div", { class: "empty", text: "Nenhuma entrevista salva ainda. Preencha a primeira na aba Nova entrevista e os indicadores aparecem aqui." })); return; }
-    if (!list.length) { host.appendChild(el("div", { class: "empty", text: "Nenhuma entrevista neste filtro. Troque a unidade, o período, o gestor ou a área." })); return; }
-    var st = stats(list), vols = list.filter(isVol), invs = list.filter(isInv), sv = stats(vols), si = stats(invs);
+    if (!list.length) { host.appendChild(el("div", { class: "empty", text: "Nenhuma entrevista neste filtro. Troque o tipo de saída, a unidade, o mês, o gestor, a área ou o entrevistador." })); return; }
+    var t = $("#ft").value, T = TIPOS[t], st = stats(list), base = stats(filtered(true)), resp = st.resp;
+    host.appendChild(heading(T.titulo, T.cor));
 
-    host.appendChild(heading("Visão geral", "--p1"));
-    var s = "De " + st.n + (st.n === 1 ? " saída" : " saídas") + ", " + np(st.nVol, st.n) + " foram voluntárias e " + np(st.nInv, st.n) + " involuntárias";
-    s += st.nSem ? ", e " + np(st.nSem, st.n) + " não têm a iniciativa registrada (recusas da base 2024). " : ". ";
-    s += nOf(st.nResp, st.n) + " aceitaram participar da entrevista.";
-    if (st.npsN) s += " Entre quem deu nota, o eNPS é " + st.nps + ": " + np(st.pro, st.npsN) + " promotores, " + np(st.neu, st.npsN) + " neutros e " + np(st.det, st.npsN) + " detratores.";
-    if (st.voltaN) s += " " + nOf(st.voltaSim, st.voltaN) + " voltariam a trabalhar na WAP.";
-    host.appendChild(story(s));
-    host.appendChild(el("div", { class: "tiles" }, [
-      tile(String(st.n), "saídas"),
-      tile(String(st.nVol), "voluntárias", np(st.nVol, st.n)),
-      tile(String(st.nInv), "involuntárias", np(st.nInv, st.n)),
-      tile(fmt(st.adesao, "%"), "aceitaram a entrevista", nOf(st.nResp, st.n)),
+    // Resumo
+    var lead, pts = [];
+    if (!t) {
+      lead = ["De ", [st.n + (st.n === 1 ? " saída" : " saídas")], ", ", [np(st.nVol, st.n)], " foram voluntárias e ", [np(st.nInv, st.n)], " involuntárias."];
+      if (st.nSem) pts.push([[np(st.nSem, st.n)], " não têm a iniciativa registrada (recusas da base 2024)."]);
+    } else if (t === "sem") {
+      lead = [[String(st.n)], " entrevistas sem iniciativa registrada, ", [np(st.n, base.n)], " das saídas no filtro."];
+    } else {
+      var vol = t === "vol", key = vol ? "principalFator" : "motivoInvoluntario", tl = tally(vol ? resp : list, field(key)), top = tl.items;
+      lead = [[String(st.n)], vol ? " saídas por iniciativa do colaborador, " : " desligamentos por iniciativa da empresa, ", [pct(st.n, base.n) + "% das saídas"], " no filtro (" + st.n + " de " + base.n + ")."];
+      if (top[0]) pts.push([vol ? "Principal fator: " : "Motivo mais registrado: ", ["“" + top[0].label + "”"], " em ", [nOf(top[0].n, tl.tot)], vol ? " de quem respondeu" : " dos casos", top[1] ? "; em seguida, “" + top[1].label + "”, com " + np(top[1].n, tl.tot) + "." : "."]);
+    }
+    pts.push(["Aceitaram a entrevista: ", [nOf(st.nResp, st.n)], st.n - st.nResp ? "; " + (st.n - st.nResp) + " recusaram." : "."]);
+    if (st.npsN) pts.push(["Recomendação: eNPS ", [String(st.nps)], " — ", [np(st.pro, st.npsN)], " promotores, ", [np(st.neu, st.npsN)], " neutros e ", [np(st.det, st.npsN)], " detratores (" + st.npsN + " notas)."]);
+    if (st.voltaN) pts.push(["Voltariam a trabalhar na WAP: ", [nOf(st.voltaSim, st.voltaN)], "."]);
+    var ex = extremes(resp);
+    if (ex) pts.push(["Experiência mais bem avaliada: ", [ex.best.label], ", com " + np(ex.best.g, ex.best.n) + " bom ou excelente; a mais mal avaliada: ", [ex.worst.label], ", com " + np(ex.worst.g, ex.worst.n) + "."]);
+    host.appendChild(insight(T.cor, T.rotulo, lead, pts));
+
+    var tiles = [tile(String(st.n), t ? "saídas" : "saídas no filtro", t ? nOf(st.n, base.n) + " do total" : null)];
+    if (!t) tiles.push(tile(String(st.nVol), "voluntárias", np(st.nVol, st.n)), tile(String(st.nInv), "involuntárias", np(st.nInv, st.n)));
+    tiles.push(tile(fmt(st.adesao, "%"), "aceitaram a entrevista", nOf(st.nResp, st.n)),
       tile(fmt(st.nps), "eNPS", st.npsN ? np(st.pro, st.npsN) + " promotores · " + np(st.neu, st.npsN) + " neutros · " + np(st.det, st.npsN) + " detratores" : "sem notas"),
-      tile(fmt(st.volta, "%"), "voltariam", st.voltaN ? nOf(st.voltaSim, st.voltaN) : "sem respostas")
-    ]));
+      tile(fmt(st.volta, "%"), "voltariam", st.voltaN ? nOf(st.voltaSim, st.voltaN) : "sem respostas"));
+    host.appendChild(el("div", { class: "tiles" }, tiles));
 
-    // Comparação lado a lado: a mesma pergunta para cada grupo.
-    var cmp = chart("Voluntárias e involuntárias lado a lado", "Cada célula mostra a quantidade e a % dentro do grupo. Avaliações: base = quem respondeu a pergunta.");
-    var line = function (label, f) { return [label, f(sv, vols), f(si, invs), f(st, list)]; };
-    var rows = [
-      line("Saídas", function (x) { return np(x.n, st.n); }),
-      line("Aceitaram a entrevista", function (x) { return np(x.nResp, x.n); }),
-      line("Notas de recomendação", function (x) { return String(x.npsN); }),
-      line("Promotores (9 e 10)", function (x) { return np(x.pro, x.npsN); }),
-      line("Neutros (7 e 8)", function (x) { return np(x.neu, x.npsN); }),
-      line("Detratores (0 a 6)", function (x) { return np(x.det, x.npsN); }),
-      line("eNPS", function (x) { return fmt(x.nps); }),
-      line("Voltariam", function (x) { return x.voltaN ? np(x.voltaSim, x.voltaN) : "-"; })
-    ];
-    DIM.forEach(function (d) { rows.push(line(d[1] + ": bom ou excelente", function (x) { var a = answered(x.resp, d[0]); return a.length ? np(goodN(a, d[0]), a.length) : "-"; })); });
-    rows.push(line("Feedback: nenhuma vez em 6 meses", function (x) { var a = answered(x.resp, "feedback"); return a.length ? np(a.filter(function (y) { return y.feedback === "Nenhuma vez"; }).length, a.length) : "-"; }));
-    cmp.appendChild(table(["Indicador", "Voluntárias", "Involuntárias", "Total"], rows, 1));
-    host.appendChild(cmp);
-    host.appendChild(npsBlock(st, list, "Recomendação (eNPS) de todas as saídas"));
+    if (!t) {
+      // Comparação lado a lado: a mesma pergunta para cada grupo.
+      var vols = list.filter(isVol), invs = list.filter(isInv), sv = stats(vols), si = stats(invs);
+      var line = function (label, f) { return [label, f(sv), f(si), f(st)]; };
+      var rows = [
+        line("Saídas", function (x) { return np(x.n, st.n); }),
+        line("Aceitaram a entrevista", function (x) { return np(x.nResp, x.n); }),
+        line("Promotores (9 e 10)", function (x) { return np(x.pro, x.npsN); }),
+        line("Neutros (7 e 8)", function (x) { return np(x.neu, x.npsN); }),
+        line("Detratores (0 a 6)", function (x) { return np(x.det, x.npsN); }),
+        line("eNPS", function (x) { return fmt(x.nps); }),
+        line("Voltariam", function (x) { return x.voltaN ? np(x.voltaSim, x.voltaN) : "-"; })
+      ];
+      DIM.forEach(function (d) { rows.push(line(d[1] + ": bom ou excelente", function (x) { var a = answered(x.resp, d[0]); return a.length ? np(goodN(a, d[0]), a.length) : "-"; })); });
+      var cmp = el("div");
+      cmp.appendChild(el("p", { class: "hint", text: "Cada célula mostra a quantidade e a % dentro do grupo. Para ver um grupo em detalhe, escolha o tipo de saída no filtro." }));
+      cmp.appendChild(table(["Indicador", "Voluntárias", "Involuntárias", "Total"], rows, 1));
+      host.appendChild(collapsible("cmp", "Voluntárias e involuntárias lado a lado", "comparação das principais respostas", cmp));
+    }
 
-    host.appendChild(groupBlock("vol", vols, st));
-    host.appendChild(groupBlock("inv", invs, st));
-
-    host.appendChild(heading("Quem saiu", "--p1"));
-    host.appendChild(breakdown("Por unidade", null, list, field("unidade")));
-    host.appendChild(breakdown("Por área", "Setor do colaborador.", list, field("setor"), 10));
-    host.appendChild(breakdown("Por gestor", "Gestor direto. Nomes escritos de jeitos diferentes contam juntos.", list, field("gestor"), 10));
-    host.appendChild(breakdown("Por entrevistador", null, list, field("entrevistador"), 10));
-    host.appendChild(byMonth(list));
-
-    host.appendChild(legacyBlock(list));
+    host.appendChild(questions(list));
+    host.appendChild(collapsible("dizem", "O que estão dizendo", commentCount(list) + " comentários com contexto", sayings(list)));
+    var quem = el("div");
+    quem.appendChild(breakdown("Por unidade", null, list, field("unidade")));
+    quem.appendChild(breakdown("Por área", "Setor do colaborador.", list, field("setor"), 10));
+    quem.appendChild(breakdown("Por gestor", "Gestor direto. Nomes escritos de jeitos diferentes contam juntos.", list, field("gestor"), 10));
+    quem.appendChild(breakdown("Por entrevistador", null, list, field("entrevistador"), 10));
+    quem.appendChild(byMonth(list));
+    host.appendChild(collapsible("quem", "Quem saiu", "por unidade, área, gestor, entrevistador e mês", quem));
+    var old = list.filter(function (x) { return x.origem === "Base 2024"; });
+    if (old.length) host.appendChild(collapsible("leg", "Perguntas da base 2024", old.length + " entrevistas do formulário antigo", legacyBlock(old)));
   }
 
   /* ---------- Respostas ---------- */
@@ -775,7 +828,7 @@
   }
 
   function loadEntries() {
-    return store.list().then(function (rows) { entries = rows; fGestor.refresh(rows); fSetor.refresh(rows); renderAll(); })
+    return store.list().then(function (rows) { entries = rows; FILTROS.forEach(function (f) { f.refresh(rows); }); renderAll(); })
       .catch(function (err) { warn("Não foi possível carregar as entrevistas. " + ((err && err.message) || "Recarregue a página.")); });
   }
   $("#reload").addEventListener("click", loadEntries);

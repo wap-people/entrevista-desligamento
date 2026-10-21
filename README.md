@@ -9,7 +9,7 @@ Formulário para o time de People conduzir e registrar entrevistas de desligamen
 ## Telas
 
 1. **Nova entrevista**: formulário em seções, com perguntas condicionais e validação. O entrevistador já vem marcado com o usuário logado.
-2. **Indicadores**: contados como história. Visão geral ("de X saídas, X voluntárias e X involuntárias"), comparação lado a lado, depois um bloco para voluntárias e outro para involuntárias com todas as perguntas e os comentários completos com contexto, quem saiu (unidade, área, gestor, entrevistador, mês) e as perguntas que só existiam na base 2024. Todo indicador mostra quantidade e %.
+2. **Indicadores**: guiados por filtros. Escolha o tipo de saída (todas, voluntárias, involuntárias, sem iniciativa), a unidade, a origem e, com seleção múltipla e busca, os meses, gestores, áreas e entrevistadores. A página mostra um resumo em cartão, os cartões de número, todas as perguntas com quantidade e % e, ao clicar, a comparação voluntárias x involuntárias, os comentários com contexto, quem saiu e as perguntas da base 2024.
 3. **Respostas**: lista, detalhe, **Baixar Excel** (abas Entrevistas e Indicadores) e exclusão com dois cliques (só administradoras).
 4. **Usuários** (só administradoras): criar usuário, trocar senha, dar ou tirar admin, desativar. Mostra a auditoria de quem registrou e quem excluiu cada entrevista.
 

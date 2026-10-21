@@ -180,8 +180,32 @@ footer { padding-block: 40px 56px; color: var(--muted); font-size: 13px; }
 @media (prefers-reduced-motion: no-preference) { .chip span, .btn { transition: background-color .12s, border-color .12s; } }
 
 /* Indicadores contados como história */
-.story { font-size: 18px; line-height: 1.55; margin: 16px 0 0; max-width: 72ch; }
 .lead { font-weight: 600; margin: 0 0 8px; }
-.sub-h { font-size: 20px; margin: 40px 0 0; padding-top: 16px; border-top: 1px solid var(--line); }
 .tile small { display: block; margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.35; }
 .chart .lnk { margin-top: 8px; }
+/* Resumo em cartão */
+.insight { margin-top: 16px; background: var(--bg-alt); border-left: 4px solid var(--c, var(--p1)); border-radius: 0 12px 12px 0; padding: 18px 22px; }
+.insight-l { display: block; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.insight-lead { font-size: 20px; line-height: 1.4; margin: 0; max-width: 60ch; }
+.insight ul { margin: 12px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; max-width: 72ch; }
+.insight b { font-weight: 700; }
+/* Seções que abrem ao clicar */
+.fold { margin-top: 32px; border: 1px solid var(--line); border-radius: 12px; }
+.fold > summary { list-style: none; cursor: pointer; padding: 16px 48px 16px 20px; position: relative; display: flex; flex-direction: column; gap: 2px; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary span { font-size: 18px; font-weight: 600; }
+.fold > summary small { color: var(--muted); font-size: 14px; }
+.fold > summary::after { content: ""; position: absolute; right: 22px; top: 24px; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform .15s; }
+.fold[open] > summary::after { transform: rotate(-135deg); top: 28px; }
+.fold > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 12px; }
+.fold-b { padding: 0 20px 20px; border-top: 1px solid var(--line); }
+.fold-b > div > .chart:first-child, .fold-b > div > .hint:first-child { margin-top: 16px; }
+/* Distribuição por nota: fundo leve por faixa */
+.nps-t { min-width: 520px; }
+.nps-t .nd { background: color-mix(in srgb, var(--s4) 14%, transparent); }
+.nps-t .nn { background: color-mix(in srgb, var(--s3) 30%, transparent); }
+.nps-t .npr { background: color-mix(in srgb, var(--s1) 16%, transparent); }
+.nps-t th, .nps-t td { text-align: center; padding: 8px 6px; }
+.legend i.nd { background: color-mix(in srgb, var(--s4) 35%, transparent); }
+.legend i.nn { background: color-mix(in srgb, var(--s3) 60%, transparent); }
+.legend i.npr { background: color-mix(in srgb, var(--s1) 40%, transparent); }
