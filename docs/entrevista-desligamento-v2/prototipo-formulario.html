@@ -1,0 +1,723 @@
+<title>Entrevista de Desligamento V2</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* Formulário em coluna única com três abas: Nova entrevista, Indicadores (visão macro) e Respostas (registro e Excel). Símbolo de barras da marca ao lado dos títulos de seção. */
+:root {
+  --bg: #FFFFFF;
+  --bg-alt: #F5F5F5;
+  --fg: #1A1A1A;
+  --muted: #4D4D4D;
+  --line: #E6E6E6;
+  --line-strong: #808080;
+  --accent: #1A1A1A;
+  --on-accent: #FFFFFF;
+  --sel-bg: #B2DFE3;
+  --sel-fg: #1A1A1A;
+  --sel-line: #0094A1;
+  --bar: #0094A1;
+  --err: #CB2A44;
+  --focus: #0094A1;
+  --p1: #0094A1;
+  --p2: #CB2A44;
+  --p3: #F8AD0E;
+  --p4: #79B446;
+  --s1: #006770;
+  --s2: #4DB4BD;
+  --s3: #FDE6B6;
+  --s4: #CB2A44;
+  --font: "Inter", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1A1A1A; --bg-alt: #333333; --fg: #FFFFFF; --muted: #CCCCCC; --line: #4D4D4D; --line-strong: #999999;
+    --accent: #FFFFFF; --on-accent: #1A1A1A; --sel-bg: #006770; --sel-fg: #FFFFFF; --sel-line: #4DB4BD;
+    --bar: #4DB4BD; --err: #DB6A7C; --focus: #F8AD0E;
+    --s1: #4DB4BD; --s2: #2D8892; --s3: #AD7809; --s4: #DB6A7C; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1A1A1A; --bg-alt: #333333; --fg: #FFFFFF; --muted: #CCCCCC; --line: #4D4D4D; --line-strong: #999999;
+  --accent: #FFFFFF; --on-accent: #1A1A1A; --sel-bg: #006770; --sel-fg: #FFFFFF; --sel-line: #4DB4BD;
+  --bar: #4DB4BD; --err: #DB6A7C; --focus: #F8AD0E;
+  --s1: #4DB4BD; --s2: #2D8892; --s3: #AD7809; --s4: #DB6A7C; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 16px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0;
+}
+.wrap { max-width: 880px; margin: 0 auto; }
+header.top { padding-block: 32px 8px; display: flex; flex-direction: column; gap: 20px; }
+.brand { display: flex; align-items: flex-end; gap: 6px; height: 40px; }
+.brand i { display: block; width: 10px; border-radius: 5px; }
+.brand i:nth-child(1) { height: 30px; background: var(--p1); }
+.brand i:nth-child(2) { height: 40px; background: var(--p2); }
+.brand i:nth-child(3) { height: 24px; background: var(--p3); }
+.brand i:nth-child(4) { height: 35px; background: var(--p4); }
+h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.1; font-weight: 300; letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+.sub { color: var(--muted); margin: 0; max-width: 62ch; }
+.tabs { display: flex; flex-wrap: wrap; gap: 0 8px; border-bottom: 1px solid var(--line); margin-top: 8px; }
+.tab { font: inherit; font-weight: 600; background: none; color: var(--muted); border: 0; border-bottom: 3px solid transparent; padding: 12px 4px; margin-right: 20px; cursor: pointer; }
+.tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--bar); }
+.tab:focus-visible, .chip input:focus-visible + span, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.count { display: inline-block; min-width: 24px; padding: 0 8px; margin-left: 8px; border-radius: 999px; background: var(--bg-alt); color: var(--fg); font-size: 13px; text-align: center; }
+.notice { background: var(--bg-alt); border-radius: 12px; padding: 12px 16px; margin: 20px 0 0; color: var(--muted); font-size: 14px; }
+.notice.warn { color: var(--fg); border: 1px solid var(--err); }
+form { padding-bottom: 8px; }
+.sec { display: flex; align-items: center; gap: 12px; margin: 40px 0 8px; font-size: 22px; line-height: 1.2; font-weight: 600; }
+.sec::before { content: ""; width: 10px; height: 28px; border-radius: 5px; background: var(--c, var(--p1)); flex: none; }
+.q { padding-block: 16px; border-bottom: 1px solid var(--line); }
+.q:last-of-type { border-bottom: 0; }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+legend, .lbl { display: block; padding: 0; font-weight: 600; margin-bottom: 10px; max-width: 64ch; }
+.opt { color: var(--muted); font-weight: 400; font-size: 14px; margin-left: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { position: relative; }
+.chip input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.chip span { display: block; padding: 10px 16px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--bg); color: var(--fg); cursor: pointer; }
+.chip input:checked + span { background: var(--sel-bg); color: var(--sel-fg); border-color: var(--sel-line); font-weight: 600; }
+.nps { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 6px; }
+.nps .chip span { padding: 10px 0; text-align: center; border-radius: 12px; font-variant-numeric: tabular-nums; }
+.ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; margin-top: 6px; }
+input[type=text], input[type=date], select, textarea { width: 100%; max-width: 520px; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line-strong); border-radius: 6px; padding: 10px 12px; }
+textarea { max-width: 100%; min-height: 96px; resize: vertical; }
+.err { color: var(--err); font-size: 14px; margin: 8px 0 0; font-weight: 600; }
+.q.bad { border-left: 3px solid var(--err); padding-left: 12px; }
+.bar { position: sticky; bottom: 0; background: var(--bg); border-top: 1px solid var(--line); padding: 14px 0 calc(14px + env(safe-area-inset-bottom, 0px)); margin-top: 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.prog { color: var(--muted); font-size: 14px; margin: 0; }
+.btn { font: inherit; font-weight: 600; background: var(--accent); color: var(--on-accent); border: 0; border-radius: 999px; padding: 12px 28px; cursor: pointer; }
+.btn.ghost { background: none; color: var(--fg); border: 1px solid var(--line-strong); }
+.btn[disabled] { opacity: .5; cursor: default; }
+.done { padding-block: 48px; display: flex; flex-direction: column; gap: 16px; align-items: flex-start; }
+.done h2 { font-size: 32px; font-weight: 300; margin: 0; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.filters { display: flex; flex-wrap: wrap; gap: 12px 20px; margin-top: 24px; align-items: flex-end; }
+.filters label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); font-weight: 600; letter-spacing: 0.04em; }
+.filters select { width: auto; min-width: 190px; max-width: 100%; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 24px; }
+.tile { background: var(--bg-alt); border-radius: 12px; padding: 18px 20px; min-width: 0; }
+.tile b { display: block; font-size: 40px; font-weight: 800; line-height: 1.05; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.tile span { color: var(--muted); font-size: 14px; display: block; margin-top: 4px; }
+.chart { margin-top: 40px; }
+.chart h3 { font-size: 18px; margin: 0 0 4px; }
+.chart .hint { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+.br { display: grid; grid-template-columns: minmax(0, 14rem) 1fr 5.5rem; gap: 12px; align-items: center; padding-block: 5px; font-size: 15px; }
+.br .tr { height: 14px; background: var(--bg-alt); border-radius: 7px; overflow: hidden; display: flex; gap: 2px; }
+.br .fl { height: 100%; background: var(--bar); border-radius: 7px; }
+.br .seg { height: 100%; }
+.br .n { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.tw { overflow-x: auto; margin-top: 12px; }
+table { border-collapse: collapse; width: 100%; min-width: 600px; font-size: 14px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+td.act { text-align: right; white-space: nowrap; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.lnk { font: inherit; font-size: 14px; background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 4px; }
+.det td { background: var(--bg-alt); }
+.det dl { margin: 0; display: grid; grid-template-columns: minmax(0, 15rem) 1fr; gap: 6px 16px; }
+.det dt { color: var(--muted); }
+.det dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.empty { margin-top: 32px; padding: 32px; border: 1px dashed var(--line-strong); border-radius: 12px; color: var(--muted); }
+.terms { display: flex; flex-wrap: wrap; gap: 8px; }
+.term { padding: 6px 14px; border-radius: 999px; background: var(--bg-alt); font-size: 15px; }
+.term b { margin-left: 8px; color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+.quote { margin: 0 0 14px; padding: 4px 0 4px 16px; border-left: 3px solid var(--bar); }
+.quote p { margin: 0; overflow-wrap: anywhere; }
+.quote small { color: var(--muted); }
+.ai { margin-top: 20px; background: var(--bg-alt); border-radius: 12px; padding: 16px 20px; }
+.ai pre { margin: 12px 0 0; white-space: pre-wrap; font: inherit; overflow-wrap: anywhere; }
+.pagehead { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-top: 28px; }
+.pagehead p { margin: 0; color: var(--muted); }
+footer { padding-block: 40px 56px; color: var(--muted); font-size: 13px; }
+@media (max-width: 560px) {
+  .nps { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .br { grid-template-columns: 1fr 5rem; }
+  .br .tr { grid-column: 1 / -1; grid-row: 2; }
+  .det dl { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: no-preference) { .chip span, .btn { transition: background-color .12s, border-color .12s; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <h1>Entrevista de Desligamento V2</h1>
+    <p class="sub">WAP | WAAW by Alok. Preencha durante a conversa. Cada entrevista fica guardada aqui, entra nos indicadores na hora e pode ser baixada em Excel.</p>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tab-nova" aria-selected="true" aria-controls="p-nova">Nova entrevista</button>
+      <button class="tab" role="tab" id="tab-ind" aria-selected="false" aria-controls="p-ind">Indicadores</button>
+      <button class="tab" role="tab" id="tab-resp" aria-selected="false" aria-controls="p-resp">Respostas<span class="count" id="cnt">0</span></button>
+    </div>
+  </header>
+
+  <div id="dbwarn" class="notice warn" hidden>Não foi possível conectar o armazenamento nesta visualização. Você pode preencher, mas não salvar.</div>
+
+  <section id="p-nova" role="tabpanel" aria-labelledby="tab-nova">
+    <form id="f" novalidate></form>
+    <div id="done" class="done" hidden>
+      <h2 id="donetxt">Entrevista salva</h2>
+      <p class="sub">Ela já entrou nos indicadores e na aba Respostas.</p>
+      <div class="row">
+        <button class="btn" id="again" type="button">Nova entrevista</button>
+        <button class="btn ghost" id="seeind" type="button">Ver indicadores</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="p-ind" role="tabpanel" aria-labelledby="tab-ind" hidden>
+    <div class="filters">
+      <label for="fu">UNIDADE<select id="fu"></select></label>
+      <label for="fp">PERÍODO<select id="fp">
+        <option value="0">Todo o período</option>
+        <option value="30">Últimos 30 dias</option>
+        <option value="90">Últimos 90 dias</option>
+        <option value="365">Últimos 12 meses</option>
+      </select></label>
+    </div>
+    <div id="ind-main"></div>
+    <div class="chart" id="voz">
+      <h3>O que os colaboradores estão dizendo</h3>
+      <p class="hint">Vem das perguntas “o que mudaria” e “fatores secundários”. Sem nome do colaborador.</p>
+      <div id="voz-terms" class="terms"></div>
+      <div class="ai" id="aibox" hidden>
+        <div class="row">
+          <button class="btn ghost" id="aibtn" type="button">Resumir temas com Claude</button>
+          <button class="btn ghost" id="aistop" type="button" hidden>Parar</button>
+          <span class="hint" style="margin:0">Os comentários do filtro atual são enviados a Claude, na sua conta.</span>
+        </div>
+        <pre id="aiout"></pre>
+      </div>
+      <div id="voz-quotes" style="margin-top:20px"></div>
+    </div>
+  </section>
+
+  <section id="p-resp" role="tabpanel" aria-labelledby="tab-resp" hidden>
+    <div class="pagehead">
+      <p id="respinfo">Todas as entrevistas salvas.</p>
+      <button class="btn" id="xls" type="button" hidden>Baixar Excel</button>
+    </div>
+    <div id="dlmsg" class="notice" hidden></div>
+    <div id="resp-body"></div>
+  </section>
+
+  <footer>As opções de entrevistador seguem o Google Forms da V2; as demais seguem as categorias da base atual. Ajuste conforme a versão final aprovada.</footer>
+</div>
+
+<script>
+(function () {
+  var UNIDADES = ["Wap | Afonso Pena", "Wap | São Marcos", "Wap | Eusébio", "Wap | Linhares", "Wap | Serra"];
+  var SETORES = ["Adm de Vendas", "Agendamento", "Almox de Pós Vendas", "Auditoria Interna", "Contabilidade", "Customer Experience", "Dados", "Design", "Diretoria", "DTM", "E-commerce", "Expedição", "Facilities", "Financeiro", "Fiscal", "FP&A", "Garantia ADM", "Garantia Tecnica", "Inventario", "Internacional", "Jurídico", "Logistica", "Marketing - Conteúdo", "Marketing - Growth", "Marketing - Performance", "Marketing - Vídeo", "Operações Ecom", "P&D", "People", "PMO&BPM", "Produção", "Qualidade", "Recebimento Fiscal", "Recepção e Conservação", "Segurança do Trabalho", "Suprimentos", "TI", "Trade MKT", "Vendas", "Vendas Internas"];
+  var INIC = ["Demissão voluntária (colaborador)", "Demissão involuntária (empresa)"];
+  var FATORES = ["Remuneração e/ou Benefícios", "Liderança", "Clima e/ou Cultura", "Desenvolvimento e/ou crescimento na carreira", "Equilíbrio entre vida pessoal e profissional", "Atividades ou responsabilidades", "Falta de reconhecimento", "Mudança pessoal ou familiar", "Outro"];
+  var MOTIVOS = ["Baixa performance (entrega)", "Comportamentos desalinhados aos valores", "Conduta em desacordo com normas internas (compliance)", "Redução de quadro", "Outro"];
+  var ESCALA = ["Excelente", "Bom", "Regular", "Ruim"];
+  var FEEDBACK = ["Nenhuma vez", "1 a 2 vezes", "3 a 5 vezes", "6 vezes ou mais"];
+  var SN = ["Sim", "Não"];
+  var ENTREV = ["Ana Beatriz Capistrano Esteves", "Ana Maria Oliveira Silva Moreira", "Angelica Caroline Andrade", "Amanda Batista dos Santos", "Ayanne Barroncas Maquine", "Hyan Borsoneli Nardi", "Miriane Macedo do Valle", "Giovana Laureano Lopes Pontes", "Fernanda Mendes da Silva", "Outro"];
+
+  var participa = function (s) { return s.aceitou === "Sim"; };
+  var voluntaria = function (s) { return participa(s) && s.iniciativa === INIC[0]; };
+  var involuntaria = function (s) { return s.iniciativa === INIC[1]; };
+
+  var Q = {
+    climaArea: "Qual a sua opinião sobre o clima no ambiente de trabalho dentro da sua grande área?",
+    climaEmpresa: "Qual a sua opinião sobre o clima no ambiente de trabalho na empresa como um todo?",
+    gestorRel: "Como você avalia seu relacionamento com seu gestor direto?",
+    feedback: "Nos últimos 6 meses, quantas vezes você recebeu feedback do seu gestor direto?",
+    salario: "Como você avalia o salário que recebe atualmente em relação às suas responsabilidades?",
+    beneficios: "Como você avalia nossos benefícios?",
+    desenvolvimento: "Como você avalia as oportunidades de desenvolvimento e crescimento profissional que teve na WAP?",
+    equilibrio: "Como você avalia o equilíbrio entre sua vida pessoal e profissional durante o período em que trabalhou na WAP?"
+  };
+
+  var F = [
+    { sec: "Identificação", c: "--p1" },
+    { id: "data", label: "Data", type: "date", req: 1 },
+    { id: "entrevistador", label: "Nome do Entrevistador", type: "radio", options: ENTREV, req: 1 },
+    { id: "entrevistadorOutro", label: "Outro: nome do entrevistador", type: "text", req: 1, when: function (s) { return s.entrevistador === "Outro"; } },
+    { id: "unidade", label: "Unidade", type: "radio", options: UNIDADES, req: 1 },
+    { id: "colaborador", label: "Nome completo do colaborador", type: "text", req: 1 },
+    { id: "setor", label: "Setor do colaborador", type: "combo", options: SETORES, req: 1 },
+    { id: "gestor", label: "Gestor direto", type: "text", req: 1 },
+    { sec: "Desligamento", c: "--p2" },
+    { id: "iniciativa", label: "De quem foi a iniciativa do desligamento?", type: "radio", options: INIC, req: 1 },
+    { id: "aceitou", label: "O colaborador aceitou participar da entrevista de desligamento?", type: "radio", options: SN, req: 1 },
+    { sec: "Em caso de saída voluntária", c: "--p4", when: voluntaria },
+    { id: "principalFator", label: "Qual foi o principal fator que influenciou sua decisão de sair da WAP?", type: "radio", options: FATORES, req: 1, when: voluntaria },
+    { id: "principalFatorOutro", label: "Outro: qual foi o principal fator?", type: "text", req: 1, when: function (s) { return voluntaria(s) && s.principalFator === "Outro"; } },
+    { id: "secundarios", label: "Existiram fatores secundários que contribuíram para sua decisão de sair da WAP?", type: "text", when: voluntaria },
+    { sec: "Em caso de saída involuntária", c: "--p2", when: involuntaria },
+    { id: "motivoInvoluntario", label: "Qual foi o motivo do desligamento involuntário?", type: "radio", options: MOTIVOS, req: 1, when: involuntaria },
+    { id: "motivoInvoluntarioOutro", label: "Outro: qual foi o motivo?", type: "text", req: 1, when: function (s) { return involuntaria(s) && s.motivoInvoluntario === "Outro"; } },
+    { sec: "Experiência do Colaborador", c: "--p3", when: participa },
+    { id: "climaArea", label: Q.climaArea, type: "radio", options: ESCALA, req: 1, when: participa },
+    { id: "climaEmpresa", label: Q.climaEmpresa, type: "radio", options: ESCALA, req: 1, when: participa },
+    { id: "gestorRel", label: Q.gestorRel, type: "radio", options: ESCALA, req: 1, when: participa },
+    { id: "feedback", label: Q.feedback, type: "radio", options: FEEDBACK, req: 1, when: participa },
+    { id: "salario", label: Q.salario, type: "radio", options: ESCALA, req: 1, when: participa },
+    { id: "beneficios", label: Q.beneficios, type: "radio", options: ESCALA, req: 1, when: participa },
+    { id: "desenvolvimento", label: Q.desenvolvimento, type: "radio", options: ESCALA, req: 1, when: participa },
+    { id: "equilibrio", label: Q.equilibrio, type: "radio", options: ESCALA, req: 1, when: participa },
+    { sec: "Saída e Recomendação", c: "--p4", when: participa },
+    { id: "voltaria", label: "Caso tivesse a oportunidade, você voltaria a trabalhar na empresa?", type: "radio", options: SN, req: 1, when: participa },
+    { id: "nps", label: "Em uma escala de 0 a 10, o quanto você recomenda a WAP | WAAW by Alok como uma boa empresa para se trabalhar?", type: "nps", req: 1, when: participa },
+    { id: "mudaria", label: "Se pudesse mudar uma coisa na WAP para melhorar a experiência dos colaboradores, o que mudaria?", type: "textarea", when: participa },
+    { sec: "Registro do Entrevistador", c: "--p1" },
+    { id: "obs", label: "Observações gerais do entrevistador", type: "textarea" }
+  ];
+
+  var COLS = [
+    ["data", "Data"], ["criadoEm", "Registrado em"], ["entrevistador", "Entrevistador"], ["unidade", "Unidade"], ["colaborador", "Colaborador"], ["setor", "Setor"], ["gestor", "Gestor direto"],
+    ["iniciativa", "Iniciativa do desligamento"], ["aceitou", "Aceitou participar"], ["principalFator", "Principal fator da saída"], ["secundarios", "Fatores secundários"],
+    ["motivoInvoluntario", "Motivo do desligamento involuntário"], ["climaArea", "Clima na grande área"], ["climaEmpresa", "Clima na empresa"],
+    ["gestorRel", "Relacionamento com o gestor"], ["feedback", "Feedback nos últimos 6 meses"], ["salario", "Salário"], ["beneficios", "Benefícios"],
+    ["desenvolvimento", "Desenvolvimento e crescimento"], ["equilibrio", "Equilíbrio vida pessoal e profissional"], ["voltaria", "Voltaria a trabalhar na WAP"],
+    ["nps", "Recomendação (0 a 10)"], ["mudaria", "O que mudaria"], ["obs", "Observações gerais do entrevistador"]
+  ];
+  var DIM = [["climaArea", "Clima na grande área"], ["climaEmpresa", "Clima na empresa"], ["gestorRel", "Relacionamento com o gestor"], ["salario", "Salário"], ["beneficios", "Benefícios"], ["desenvolvimento", "Desenvolvimento e crescimento"], ["equilibrio", "Equilíbrio vida e trabalho"]];
+
+  var $ = function (s) { return document.querySelector(s); };
+  function el(tag, attrs, kids) {
+    var n = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      if (k === "text") n.textContent = attrs[k]; else if (k === "class") n.className = attrs[k]; else n.setAttribute(k, attrs[k]);
+    });
+    (kids || []).forEach(function (c) { if (c) n.appendChild(c); });
+    return n;
+  }
+  function today() { var d = new Date(), p = function (n) { return String(n).padStart(2, "0"); }; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); }
+  function brDate(s) { return s ? String(s).split("-").reverse().join("/") : ""; }
+
+  var S = {};
+  var nodes = [];
+  var form = $("#f");
+
+  function chip(name, value, label) {
+    var i = el("input", { type: "radio", name: name, value: value });
+    return el("label", { class: "chip" }, [i, el("span", { text: label })]);
+  }
+
+  F.forEach(function (f) {
+    var node;
+    if (f.sec) {
+      node = el("h2", { class: "sec", text: f.sec });
+      node.style.setProperty("--c", "var(" + f.c + ")");
+    } else {
+      node = el("div", { class: "q", id: "q-" + f.id });
+      var body;
+      var optTag = f.req ? null : el("span", { class: "opt", text: "opcional" });
+      if (f.type === "radio" || f.type === "nps") {
+        var lg = el("legend", { text: f.label }); if (optTag) lg.appendChild(optTag);
+        var wrap;
+        if (f.type === "nps") {
+          wrap = el("div", { class: "nps" });
+          for (var k = 0; k <= 10; k++) wrap.appendChild(chip(f.id, String(k), String(k)));
+        } else {
+          wrap = el("div", { class: "chips" });
+          f.options.forEach(function (o) { wrap.appendChild(chip(f.id, o, o)); });
+        }
+        var kids = [lg, wrap];
+        if (f.type === "nps") kids.push(el("div", { class: "ends" }, [el("span", { text: "0 = não recomendo" }), el("span", { text: "10 = recomendo muito" })]));
+        body = el("fieldset", null, kids);
+      } else {
+        var lb = el("label", { class: "lbl", for: "f-" + f.id, text: f.label }); if (optTag) lb.appendChild(optTag);
+        var inp, extra = null;
+        if (f.type === "select") {
+          inp = el("select", { id: "f-" + f.id });
+          inp.appendChild(el("option", { value: "", text: "Selecione" }));
+          f.options.forEach(function (o) { inp.appendChild(el("option", { value: o, text: o })); });
+        } else if (f.type === "combo") {
+          inp = el("input", { id: "f-" + f.id, type: "text", list: "dl-" + f.id, autocomplete: "off", placeholder: "Digite ou escolha a área" });
+          inp.setAttribute("data-combo", "1");
+          extra = el("datalist", { id: "dl-" + f.id });
+          f.options.forEach(function (o) { extra.appendChild(el("option", { value: o })); });
+        } else if (f.type === "textarea") {
+          inp = el("textarea", { id: "f-" + f.id, rows: "4" });
+        } else {
+          inp = el("input", { id: "f-" + f.id, type: f.type });
+        }
+        inp.setAttribute("data-f", f.id);
+        body = el("div", null, [lb, inp, extra]);
+      }
+      node.appendChild(body);
+      node.appendChild(el("p", { class: "err", text: f.type === "combo" ? "Escolha uma área da lista." : "Responda esta pergunta.", hidden: "" }));
+    }
+    node._f = f;
+    nodes.push(node);
+    form.appendChild(node);
+  });
+
+  form.appendChild(el("div", { class: "bar" }, [
+    el("p", { class: "prog", id: "prog", "aria-live": "polite" }),
+    el("button", { class: "btn", type: "submit", id: "save", text: "Salvar entrevista" })
+  ]));
+
+  function visible(f) { return !f.when || f.when(S); }
+  function missing() {
+    return F.filter(function (f) { return f.id && f.req && visible(f) && (S[f.id] === undefined || S[f.id] === ""); });
+  }
+  function applyVisibility() {
+    nodes.forEach(function (n) { n.hidden = !visible(n._f); });
+    var miss = missing();
+    $("#prog").textContent = miss.length ? "Faltam " + miss.length + (miss.length === 1 ? " resposta" : " respostas") : "Tudo respondido";
+  }
+
+  form.addEventListener("input", function (e) {
+    var t = e.target;
+    if (t.type === "radio") S[t.name] = t.name === "nps" ? Number(t.value) : t.value;
+    else if (t.getAttribute("data-f")) {
+      var val = t.value;
+      if (t.getAttribute("data-combo")) {
+        var low = val.trim().toLowerCase(), hit = "";
+        SETORES.forEach(function (o) { if (o.toLowerCase() === low) hit = o; });
+        val = hit;
+      }
+      S[t.getAttribute("data-f")] = val;
+    }
+    var q = t.closest(".q"); if (q) { q.classList.remove("bad"); q.querySelector(".err").hidden = true; }
+    applyVisibility();
+  });
+
+  function reset() {
+    S = {};
+    form.reset();
+    var d = $("#f-data"); d.value = today(); S.data = d.value;
+    applyVisibility();
+  }
+
+  var db = null, downloads = null, sample = null;
+  var TABS = ["nova", "ind", "resp"];
+  function showTab(which) {
+    TABS.forEach(function (t) {
+      $("#p-" + t).hidden = t !== which;
+      $("#tab-" + t).setAttribute("aria-selected", String(t === which));
+    });
+    window.scrollTo(0, 0);
+  }
+  TABS.forEach(function (t) { $("#tab-" + t).addEventListener("click", function () { showTab(t); }); });
+  $("#seeind").addEventListener("click", function () { showTab("ind"); });
+  $("#again").addEventListener("click", function () { $("#done").hidden = true; form.hidden = false; reset(); window.scrollTo(0, 0); });
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var miss = missing();
+    if (miss.length) {
+      miss.forEach(function (f) { var q = $("#q-" + f.id); q.classList.add("bad"); q.querySelector(".err").hidden = false; });
+      $("#q-" + miss[0].id).scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    if (!db) { $("#dbwarn").hidden = false; return; }
+    var doc = { origem: "V2", criadoEm: new Date().toISOString() };
+    F.forEach(function (f) {
+      if (!f.id || !visible(f)) return;
+      var v = S[f.id];
+      if (v === undefined || v === "") return;
+      doc[f.id] = typeof v === "string" ? v.trim() : v;
+    });
+    if (doc.entrevistador === "Outro" && doc.entrevistadorOutro) doc.entrevistador = doc.entrevistadorOutro;
+    delete doc.entrevistadorOutro;
+    if (doc.principalFator === "Outro" && doc.principalFatorOutro) doc.principalFator = "Outro: " + doc.principalFatorOutro;
+    delete doc.principalFatorOutro;
+    if (doc.motivoInvoluntario === "Outro" && doc.motivoInvoluntarioOutro) doc.motivoInvoluntario = "Outro: " + doc.motivoInvoluntarioOutro;
+    delete doc.motivoInvoluntarioOutro;
+    var btn = $("#save"); btn.disabled = true; btn.textContent = "Salvando";
+    db.collection("entrevistas").add(doc).then(function () {
+      $("#donetxt").textContent = "Entrevista de " + doc.colaborador + " salva";
+      form.hidden = true; $("#done").hidden = false; window.scrollTo(0, 0);
+    }).catch(function (err) {
+      $("#dbwarn").textContent = "Não foi possível salvar" + (err && err.code === "quota_exceeded" ? ": o limite de registros foi atingido." : ". Tente de novo em instantes.");
+      $("#dbwarn").hidden = false;
+    }).then(function () { btn.disabled = false; btn.textContent = "Salvar entrevista"; });
+  });
+
+  /* ---------- Dados e indicadores ---------- */
+  var entries = [];
+  var armed = null, openId = null;
+
+  var fu = $("#fu");
+  fu.appendChild(el("option", { value: "", text: "Todas as unidades" }));
+  UNIDADES.forEach(function (u) { fu.appendChild(el("option", { value: u, text: u })); });
+  fu.addEventListener("change", renderAll);
+  $("#fp").addEventListener("change", renderAll);
+
+  function pct(a, b) { return b ? Math.round((a / b) * 100) : null; }
+  function fmt(v, suf) { return v === null || v === undefined ? "-" : v + (suf || ""); }
+  function entryDate(x) { return x.data || (x.criadoEm || "").slice(0, 10); }
+
+  function filtered() {
+    var u = fu.value, days = Number($("#fp").value);
+    var cut = null;
+    if (days) { var d = new Date(); d.setDate(d.getDate() - days); cut = d.toISOString().slice(0, 10); }
+    return entries.filter(function (x) { return (!u || x.unidade === u) && (!cut || entryDate(x) >= cut); });
+  }
+  function stats(list) {
+    var resp = list.filter(function (x) { return x.aceitou === "Sim"; });
+    var nps = resp.filter(function (x) { return typeof x.nps === "number"; });
+    var pro = nps.filter(function (x) { return x.nps >= 9; }).length;
+    var det = nps.filter(function (x) { return x.nps <= 6; }).length;
+    var volt = resp.filter(function (x) { return x.voltaria; });
+    return {
+      n: list.length, resp: resp,
+      adesao: pct(resp.length, list.length),
+      vol: pct(list.filter(function (x) { return x.iniciativa === INIC[0]; }).length, list.length),
+      nps: nps.length ? Math.round(((pro - det) / nps.length) * 100) : null,
+      pro: pro, det: det, neu: nps.length - pro - det, npsN: nps.length,
+      volta: pct(volt.filter(function (x) { return x.voltaria === "Sim"; }).length, volt.length)
+    };
+  }
+  function good(list, key) {
+    var a = list.filter(function (x) { return x[key]; });
+    return pct(a.filter(function (x) { return x[key] === "Excelente" || x[key] === "Bom"; }).length, a.length);
+  }
+  function count(list, key) {
+    var m = {};
+    list.forEach(function (x) {
+      var v = x[key];
+      if (v === undefined || v === "") return;
+      if (typeof v === "string" && v.indexOf("Outro: ") === 0) v = "Outro";
+      m[v] = (m[v] || 0) + 1;
+    });
+    return m;
+  }
+  function bars(title, hint, list, key, order) {
+    var m = count(list, key);
+    var tot = Object.keys(m).reduce(function (a, k) { return a + m[k]; }, 0);
+    var keys = order || Object.keys(m).sort(function (a, b) { return m[b] - m[a]; });
+    var box = el("div", { class: "chart" }, [el("h3", { text: title })]);
+    if (hint) box.appendChild(el("p", { class: "hint", text: hint }));
+    if (!tot) { box.appendChild(el("p", { class: "hint", text: "Sem respostas neste filtro." })); return box; }
+    keys.forEach(function (k) {
+      var v = m[k] || 0, p = Math.round((v / tot) * 100);
+      var fl = el("div", { class: "fl" }); fl.style.width = p + "%";
+      box.appendChild(el("div", { class: "br" }, [el("span", { text: k }), el("div", { class: "tr" }, [fl]), el("span", { class: "n", text: v + " (" + p + "%)" })]));
+    });
+    return box;
+  }
+  function tile(v, label) { return el("div", { class: "tile" }, [el("b", { text: v }), el("span", { text: label })]); }
+
+  function renderMain(list) {
+    var host = $("#ind-main"); host.textContent = "";
+    if (!entries.length) {
+      host.appendChild(el("div", { class: "empty", text: "Nenhuma entrevista salva ainda. Preencha a primeira na aba Nova entrevista e os indicadores aparecem aqui." }));
+      return;
+    }
+    if (!list.length) {
+      host.appendChild(el("div", { class: "empty", text: "Nenhuma entrevista neste filtro. Troque a unidade ou o período." }));
+      return;
+    }
+    var st = stats(list);
+    host.appendChild(el("div", { class: "tiles" }, [
+      tile(String(st.n), "entrevistas"),
+      tile(fmt(st.adesao, "%"), "aceitaram responder"),
+      tile(fmt(st.vol, "%"), "saídas por iniciativa do colaborador"),
+      tile(fmt(st.nps), "eNPS (% promotores menos % detratores)"),
+      tile(fmt(st.volta, "%"), "voltariam a trabalhar na WAP")
+    ]));
+
+    var resp = st.resp;
+    var nb = el("div", { class: "chart" }, [el("h3", { text: "eNPS: detratores, neutros e promotores" }), el("p", { class: "hint", text: "Detratores: notas 0 a 6. Neutros: 7 e 8. Promotores: 9 e 10. O eNPS é a porcentagem de promotores menos a de detratores." })]);
+    if (!st.npsN) {
+      nb.appendChild(el("p", { class: "hint", text: "Sem notas de recomendação neste filtro." }));
+    } else {
+      [["Detratores (0 a 6)", st.det, "--s4"], ["Neutros (7 e 8)", st.neu, "--s3"], ["Promotores (9 e 10)", st.pro, "--s1"]].forEach(function (g) {
+        var p = Math.round((g[1] / st.npsN) * 100);
+        var fl = el("div", { class: "fl" }); fl.style.width = p + "%"; fl.style.background = "var(" + g[2] + ")";
+        nb.appendChild(el("div", { class: "br" }, [el("span", { text: g[0] }), el("div", { class: "tr" }, [fl]), el("span", { class: "n", text: g[1] + " (" + p + "%)" })]));
+      });
+    }
+    host.appendChild(nb);
+    host.appendChild(bars("Principal fator da saída", "Colaboradores que pediram para sair e responderam.", resp.filter(function (x) { return x.principalFator; }), "principalFator"));
+    host.appendChild(bars("Motivo do desligamento involuntário", "Desligamentos por iniciativa da empresa.", list.filter(function (x) { return x.motivoInvoluntario; }), "motivoInvoluntario"));
+
+    var sb = el("div", { class: "chart" }, [el("h3", { text: "Como avaliam a experiência" }), el("p", { class: "hint", text: "Cada barra soma 100%. O número à direita é a parcela de Bom ou Excelente." })]);
+    var lg = el("div", { class: "legend" });
+    ESCALA.forEach(function (k, i) { lg.appendChild(el("span", null, [el("i", { style: "background:var(--s" + (i + 1) + ")" }), document.createTextNode(k)])); });
+    sb.appendChild(lg);
+    DIM.forEach(function (d) {
+      var a = resp.filter(function (x) { return x[d[0]]; }), tot = a.length;
+      var tr = el("div", { class: "tr" });
+      ESCALA.forEach(function (k, i) {
+        var n = a.filter(function (x) { return x[d[0]] === k; }).length;
+        if (!n) return;
+        var s = el("div", { class: "seg", title: k + ": " + n }); s.style.width = (n / tot) * 100 + "%"; s.style.background = "var(--s" + (i + 1) + ")";
+        tr.appendChild(s);
+      });
+      sb.appendChild(el("div", { class: "br" }, [el("span", { text: d[1] }), tr, el("span", { class: "n", text: fmt(good(resp, d[0]), "%") })]));
+    });
+    host.appendChild(sb);
+    host.appendChild(bars("Feedback do gestor nos últimos 6 meses", null, resp, "feedback", FEEDBACK));
+
+    var tb = el("tbody");
+    UNIDADES.forEach(function (u) {
+      var l = list.filter(function (x) { return x.unidade === u; });
+      if (!l.length) return;
+      var s = stats(l);
+      tb.appendChild(el("tr", null, [el("td", { text: u }), el("td", { class: "num", text: String(s.n) }), el("td", { class: "num", text: fmt(s.adesao, "%") }), el("td", { class: "num", text: fmt(s.nps) }), el("td", { class: "num", text: fmt(s.volta, "%") }), el("td", { class: "num", text: fmt(good(s.resp, "climaArea"), "%") })]));
+    });
+    var th = ["Unidade", "Entrevistas", "Aceitaram", "eNPS", "Voltariam", "Clima bom ou excelente"].map(function (h, i) { return el("th", { class: i ? "num" : "", text: h }); });
+    host.appendChild(el("div", { class: "chart" }, [el("h3", { text: "Por unidade" }), el("div", { class: "tw" }, [el("table", null, [el("thead", null, [el("tr", null, th)]), tb])])]));
+  }
+
+  var STOP = "para com uma uns umas que por mais mas como dos das nos nas aos seu sua seus suas nao não sim muito muita muitos muitas tem ter tinha foi ser são era ele ela eles elas isso isto essa esse esses essas este esta estes estas aqui ali onde quando porque pois também tambem ainda sobre entre até ate depois antes sempre nunca pouco pouca mesmo mesma melhor melhorar poderia deveria seria mudaria mudar acho acredito falta faltou ter tido tem têm vai vão está estão estava estavam fazer feito fazem coisa coisas empresa wap pessoas pessoa colaboradores colaborador todos todas toda todo cada outro outra outros outras forma bem bom boa ruim sendo apenas só sobre dentro fora já ja nem seus minha meu meus minhas nosso nossa nossos nossas deles delas".split(" ");
+  var STOPSET = {}; STOP.forEach(function (w) { STOPSET[w] = 1; });
+  function comments(list) {
+    var out = [];
+    list.forEach(function (x) {
+      ["mudaria", "secundarios"].forEach(function (k) {
+        var t = x[k] ? String(x[k]).trim() : "";
+        if (t.length > 3) out.push({ t: t, u: x.unidade || "", s: x.setor || "", nps: x.nps, k: k });
+      });
+    });
+    return out;
+  }
+  function renderVoz(list) {
+    var cm = comments(list);
+    var terms = $("#voz-terms"); terms.textContent = "";
+    var q = $("#voz-quotes"); q.textContent = "";
+    $("#aibox").hidden = !(sample && cm.length);
+    if (!cm.length) {
+      terms.appendChild(el("p", { class: "hint", text: "Ainda não há comentários neste filtro." }));
+      return;
+    }
+    var freq = {};
+    cm.forEach(function (c) {
+      var seen = {};
+      c.t.toLowerCase().split(/[^a-zà-ÿ]+/).forEach(function (w) {
+        if (w.length < 4 || STOPSET[w] || seen[w]) return;
+        seen[w] = 1; freq[w] = (freq[w] || 0) + 1;
+      });
+    });
+    var top = Object.keys(freq).sort(function (a, b) { return freq[b] - freq[a] || (a < b ? -1 : 1); }).slice(0, 14);
+    top.forEach(function (w) { terms.appendChild(el("span", { class: "term" }, [document.createTextNode(w), el("b", { text: String(freq[w]) })])); });
+    q.appendChild(el("h3", { text: "Comentários recentes", style: "font-size:18px;margin:0 0 12px" }));
+    cm.slice(0, 8).forEach(function (c) {
+      var meta = [c.k === "mudaria" ? "O que mudaria" : "Fator secundário", c.s, c.u].filter(Boolean).join(" · ");
+      q.appendChild(el("blockquote", { class: "quote" }, [el("p", { text: c.t }), el("small", { text: meta })]));
+    });
+  }
+
+  /* ---------- Respostas ---------- */
+  function renderResp() {
+    var host = $("#resp-body"); host.textContent = "";
+    $("#cnt").textContent = String(entries.length);
+    $("#xls").hidden = !(downloads && entries.length);
+    $("#respinfo").textContent = entries.length ? entries.length + (entries.length === 1 ? " entrevista salva." : " entrevistas salvas.") + " Elas ficam guardadas aqui até você excluir." : "Todas as entrevistas salvas aparecem aqui.";
+    if (!entries.length) {
+      host.appendChild(el("div", { class: "empty", text: "Nenhuma entrevista salva ainda. Preencha a primeira na aba Nova entrevista." }));
+      return;
+    }
+    var tb = el("tbody");
+    entries.forEach(function (x) {
+      var del = el("button", { class: "lnk", type: "button", text: armed === x.id ? "Confirmar exclusão" : "Excluir" });
+      del.addEventListener("click", function () {
+        if (armed !== x.id) { armed = x.id; renderResp(); setTimeout(function () { if (armed === x.id) { armed = null; renderResp(); } }, 4000); return; }
+        armed = null; db.doc("entrevistas/" + x.id).delete();
+      });
+      var ver = el("button", { class: "lnk", type: "button", text: openId === x.id ? "Fechar" : "Ver" });
+      ver.addEventListener("click", function () { openId = openId === x.id ? null : x.id; renderResp(); });
+      tb.appendChild(el("tr", null, [
+        el("td", { text: brDate(entryDate(x)) }), el("td", { text: x.colaborador || "" }), el("td", { text: x.unidade || "" }),
+        el("td", { text: x.iniciativa || "" }), el("td", { text: x.aceitou === "Sim" ? (typeof x.nps === "number" ? "Nota " + x.nps : "Respondeu") : "Recusou" }),
+        el("td", { class: "act" }, [ver, del])
+      ]));
+      if (openId === x.id) {
+        var dl = el("dl");
+        COLS.forEach(function (c) {
+          var v = x[c[0]]; if (v === undefined || v === "") return;
+          if (c[0] === "data") v = brDate(v);
+          if (c[0] === "criadoEm") v = new Date(v).toLocaleString("pt-BR");
+          dl.appendChild(el("dt", { text: c[1] })); dl.appendChild(el("dd", { text: String(v) }));
+        });
+        var td = el("td", { colspan: "6" }, [dl]);
+        tb.appendChild(el("tr", { class: "det" }, [td]));
+      }
+    });
+    var head = ["Data", "Colaborador", "Unidade", "Iniciativa", "Resultado", ""].map(function (h) { return el("th", { text: h }); });
+    host.appendChild(el("div", { class: "tw" }, [el("table", null, [el("thead", null, [el("tr", null, head)]), tb])]));
+  }
+
+  function renderAll() {
+    var list = filtered();
+    renderMain(list);
+    renderVoz(list);
+    renderResp();
+  }
+
+  /* ---------- Excel ---------- */
+  function say(msg) { var m = $("#dlmsg"); m.textContent = msg; m.hidden = !msg; }
+  $("#xls").addEventListener("click", function () {
+    say("");
+    if (!downloads) return;
+    if (!window.XLSX) { say("Não foi possível carregar o gerador de Excel nesta visualização."); return; }
+    var asc = entries.slice().sort(function (a, b) { return entryDate(a) < entryDate(b) ? -1 : 1; });
+    var aoa = [COLS.map(function (c) { return c[1]; }).concat(["Classificação eNPS"])];
+    asc.forEach(function (x) {
+      aoa.push(COLS.map(function (c) {
+        var v = x[c[0]];
+        if (v === undefined) return "";
+        if (c[0] === "data") return brDate(v);
+        if (c[0] === "criadoEm") return new Date(v).toLocaleString("pt-BR");
+        return v;
+      }).concat([typeof x.nps === "number" ? (x.nps >= 9 ? "Promotor" : x.nps >= 7 ? "Neutro" : "Detrator") : ""]));
+    });
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = COLS.map(function (c) { return { wch: Math.min(40, Math.max(12, c[1].length + 2)) }; });
+    var st = stats(entries);
+    var ind = [["Indicador", "Valor"], ["Entrevistas", st.n], ["Aceitaram responder (%)", st.adesao === null ? "" : st.adesao], ["Saídas por iniciativa do colaborador (%)", st.vol === null ? "" : st.vol], ["eNPS", st.nps === null ? "" : st.nps], ["Promotores (notas 9 e 10)", st.pro], ["Neutros (notas 7 e 8)", st.neu], ["Detratores (notas 0 a 6)", st.det], ["Voltariam a trabalhar na WAP (%)", st.volta === null ? "" : st.volta]];
+    DIM.forEach(function (d) { var g = good(st.resp, d[0]); ind.push([d[1] + ": Bom ou Excelente (%)", g === null ? "" : g]); });
+    var wi = XLSX.utils.aoa_to_sheet(ind);
+    wi["!cols"] = [{ wch: 48 }, { wch: 12 }];
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Entrevistas");
+    XLSX.utils.book_append_sheet(wb, wi, "Indicadores");
+    var buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    downloads.save({ filename: "entrevistas-desligamento-v2-" + today() + ".xlsx", data: buf }).then(function () {
+      say("Arquivo salvo.");
+    }).catch(function (e) {
+      if (e && e.code === "declined") return;
+      say("Não foi possível baixar o arquivo agora.");
+    });
+  });
+
+  /* ---------- Resumo com Claude ---------- */
+  var ctl = null;
+  $("#aistop").addEventListener("click", function () { if (ctl) ctl.abort(); });
+  $("#aibtn").addEventListener("click", function () {
+    if (!sample) return;
+    var cm = comments(filtered());
+    if (!cm.length) return;
+    var txt = cm.slice(0, 60).map(function (c) { return "- (" + [c.s, c.u].filter(Boolean).join(", ") + ") " + c.t; }).join("\n").slice(0, 20000);
+    var prompt = "Você analisa entrevistas de desligamento da WAP | WAAW by Alok. Abaixo estão comentários de ex-colaboradores sobre o que mudariam na empresa e sobre fatores secundários da saída. " +
+      "Responda em português, sem enfeite. Liste até 5 temas, cada um em uma linha com o formato: tema: frase curta (N comentários). Use somente o que está nos comentários e não invente números. Termine com uma frase de visão geral.\n\nComentários (" + cm.length + "):\n" + txt;
+    var out = $("#aiout"), btn = $("#aibtn"), stop = $("#aistop");
+    ctl = new AbortController();
+    btn.disabled = true; stop.hidden = false; out.textContent = "Analisando os comentários...";
+    sample(prompt, { signal: ctl.signal, onText: function (u) { out.textContent = u.text; } }).catch(function (e) {
+      if (e && e.code === "cancelled") { out.textContent = (e.text || "") || "Análise interrompida."; return; }
+      var m = { not_granted: "O uso de Claude não foi liberado nesta visualização.", rate_limited: "Muitas chamadas agora. Tente de novo em alguns minutos." };
+      out.textContent = (e && e.text ? e.text + "\n\n" : "") + ((e && m[e.code]) || "Não foi possível resumir agora. Tente de novo.");
+    }).then(function () { btn.disabled = false; stop.hidden = true; ctl = null; });
+  });
+
+  reset();
+  renderAll();
+
+  var use = function (n) { return window.claude && window.claude.use ? window.claude.use(n).catch(function () { return null; }) : Promise.resolve(null); };
+  use("downloads").then(function (d) { downloads = d; renderResp(); });
+  use("sample").then(function (s) { sample = s; renderVoz(filtered()); });
+  use("db").then(function (d) {
+    if (!d) { $("#dbwarn").hidden = false; return; }
+    db = d;
+    db.collection("entrevistas").orderBy("criadoEm", "desc").limit(1000).onSnapshot(function (snap) {
+      entries = snap.docs.map(function (x) { var o = x.data(); o.id = x.id; return o; });
+      renderAll();
+    }, function () { $("#dbwarn").textContent = "A lista de respostas parou de atualizar. Recarregue a página."; $("#dbwarn").hidden = false; });
+  });
+})();
+</script>

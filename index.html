@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Entrevista de Desligamento V2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+
+<!-- Login -->
+<div id="auth" class="auth" hidden>
+  <form id="loginForm" novalidate>
+    <div class="brand" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <h1>Entrevista de Desligamento V2</h1>
+    <p class="sub">Acesso restrito ao time de People.</p>
+    <label for="loginEmail">E-mail<input id="loginEmail" type="email" autocomplete="username" required></label>
+    <label for="loginPassword">Senha<input id="loginPassword" type="password" autocomplete="current-password" required></label>
+    <button class="btn" id="loginBtn" type="submit">Entrar</button>
+    <p id="loginMsg" class="err" hidden></p>
+    <p class="hint">Esqueceu a senha ou precisa de acesso? Fale com uma administradora do sistema.</p>
+  </form>
+</div>
+
+<div id="cfgwarn" class="wrap" hidden>
+  <div class="notice warn">Configuração incompleta: preencha a chave anon do Supabase em <code>config.js</code>.</div>
+</div>
+
+<!-- App -->
+<div id="app" class="wrap" hidden>
+  <header class="top">
+    <div class="toprow">
+      <div class="brand" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div class="who"><span id="whoName"></span><button class="lnk" id="logoutBtn" type="button">Sair</button></div>
+    </div>
+    <h1>Entrevista de Desligamento V2</h1>
+    <p class="sub">WAP | WAAW by Alok. Preencha durante a conversa. Cada entrevista fica guardada, entra nos indicadores e pode ser baixada em Excel.</p>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tab-nova" aria-selected="true" aria-controls="p-nova">Nova entrevista</button>
+      <button class="tab" role="tab" id="tab-ind" aria-selected="false" aria-controls="p-ind">Indicadores</button>
+      <button class="tab" role="tab" id="tab-resp" aria-selected="false" aria-controls="p-resp">Respostas<span class="count" id="cnt">0</span></button>
+      <button class="tab" role="tab" id="tab-usr" aria-selected="false" aria-controls="p-usr" hidden>Usuários</button>
+    </div>
+  </header>
+
+  <div id="dbwarn" class="notice warn" hidden></div>
+
+  <section id="p-nova" role="tabpanel" aria-labelledby="tab-nova">
+    <form id="f" novalidate></form>
+    <div id="done" class="done" hidden>
+      <h2 id="donetxt">Entrevista salva</h2>
+      <p class="sub">Ela já entrou nos indicadores e na aba Respostas.</p>
+      <div class="row">
+        <button class="btn" id="again" type="button">Nova entrevista</button>
+        <button class="btn ghost" id="seeind" type="button">Ver indicadores</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="p-ind" role="tabpanel" aria-labelledby="tab-ind" hidden>
+    <div class="filters">
+      <label for="fu">UNIDADE<select id="fu"></select></label>
+      <label for="fp">PERÍODO<select id="fp">
+        <option value="0">Todo o período</option>
+        <option value="30">Últimos 30 dias</option>
+        <option value="90">Últimos 90 dias</option>
+        <option value="365">Últimos 12 meses</option>
+      </select></label>
+    </div>
+    <div id="ind-main"></div>
+    <div class="chart" id="voz">
+      <h3>O que os colaboradores estão dizendo</h3>
+      <p class="hint">Vem das perguntas “o que mudaria” e “fatores secundários”. Sem nome do colaborador.</p>
+      <div id="voz-terms" class="terms"></div>
+      <div id="voz-quotes" style="margin-top:20px"></div>
+    </div>
+  </section>
+
+  <section id="p-resp" role="tabpanel" aria-labelledby="tab-resp" hidden>
+    <div class="pagehead">
+      <p id="respinfo">Todas as entrevistas salvas.</p>
+      <div class="row">
+        <button class="btn ghost" id="reload" type="button">Atualizar</button>
+        <button class="btn" id="xls" type="button" hidden>Baixar Excel</button>
+      </div>
+    </div>
+    <div id="dlmsg" class="notice" hidden></div>
+    <div id="resp-body"></div>
+  </section>
+
+  <section id="p-usr" role="tabpanel" aria-labelledby="tab-usr" hidden>
+    <div class="card">
+      <h3>Novo usuário</h3>
+      <form id="newUser" class="grid2" novalidate>
+        <label for="nuName">Nome completo<input id="nuName" type="text" autocomplete="off" required></label>
+        <label for="nuEmail">E-mail<input id="nuEmail" type="email" autocomplete="off" required></label>
+        <label for="nuPass">Senha provisória (mín. 8 caracteres)<input id="nuPass" type="password" autocomplete="new-password" required></label>
+        <div class="row" style="align-self:end">
+          <label class="check"><input id="nuAdmin" type="checkbox"> Administradora</label>
+          <button class="btn sm" id="nuBtn" type="submit">Criar</button>
+        </div>
+      </form>
+    </div>
+    <div id="usrmsg" class="notice" hidden></div>
+    <div id="usr-body"></div>
+    <div class="chart">
+      <h3>Auditoria</h3>
+      <p class="hint">Quem registrou e quem excluiu cada entrevista. Mostra os 200 eventos mais recentes.</p>
+      <div id="aud-body"></div>
+    </div>
+  </section>
+
+  <footer>As opções de entrevistador seguem o Google Forms da V2; as demais seguem as categorias da base atual. Ajuste conforme a versão final aprovada.</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="config.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
