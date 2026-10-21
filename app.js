@@ -751,6 +751,9 @@
   // Melhor e pior dimensão da experiência no recorte.
   function extremes(resp) {
     var r = DIM.map(function (d) { var a = answered(resp, d[0]); return { label: d[1], n: a.length, g: goodN(a, d[0]), p: pct(goodN(a, d[0]), a.length) }; }).filter(function (x) { return x.n; });
+    // Só compara dimensões com base suficiente: 1 resposta com 100% não pode "ganhar" de 400 respostas.
+    var maxN = r.reduce(function (m, x) { return Math.max(m, x.n); }, 0);
+    r = r.filter(function (x) { return x.n >= Math.min(20, maxN) && x.n >= 0.2 * maxN; });
     if (r.length < 2) return null;
     r.sort(function (a, b) { return b.p - a.p; });
     return { best: r[0], worst: r[r.length - 1] };
@@ -862,7 +865,8 @@
       kpi("", t ? T.titulo : "Saídas", String(st.n), t ? nOf(st.n, base.n) + " do total" : "Últimos 12 meses · " + MESES[Number(lastM.k.slice(5)) - 1] + ": " + lastM.n + (prevM ? " (mês anterior: " + prevM.n + ")" : ""), spark(m12.map(function (x) { return x.n; }))),
       !t ? kpi("", "Voluntárias", fmt(pct(st.nVol, st.n), "%"), legendRow(comp), donut(comp)) : null,
       kpi("", "Aceitaram a entrevista", fmt(st.adesao, "%"), nOf(st.nResp, st.n) + " · " + (st.n - st.nResp) + pl(st.n - st.nResp, " recusou", " recusaram"), minibar([{ n: st.nResp, cls: "c-ok", label: "Aceitaram" }, { n: st.n - st.nResp, cls: "c-no", label: "Recusaram" }])),
-      kpi("kpi-nps", "eNPS", st.npsN ? (st.nps > 0 ? "+" : "") + st.nps : "–", st.npsN ? legendRow([{ n: st.pro, cls: "c-pro", label: "Promotores" }, { n: st.neu, cls: "c-neu", label: "Neutros" }, { n: st.det, cls: "c-det", label: "Detratores" }]) : "Sem notas no filtro (a base 2024 não tinha esta pergunta)", gauge(st.npsN ? st.nps : null)),
+      kpi("kpi-nps", "eNPS", st.npsN ? (st.nps > 0 ? "+" : "") + st.nps : "–", st.npsN ? el("div", null, [legendRow([{ n: st.pro, cls: "c-pro", label: "Promotores" }, { n: st.neu, cls: "c-neu", label: "Neutros" }, { n: st.det, cls: "c-det", label: "Detratores" }]),
+        st.npsN < 20 ? el("span", { class: "kpi-w", text: "Base pequena: " + st.npsN + pl(st.npsN, " nota", " notas") + ". Leia com cautela." }) : null]) : "Sem notas no filtro (a base 2024 não tinha esta pergunta)", gauge(st.npsN ? st.nps : null)),
       kpi("", "Voltariam a trabalhar na WAP", fmt(st.volta, "%"), st.voltaN ? nOf(st.voltaSim, st.voltaN) + " · " + (st.voltaN - st.voltaSim) + pl(st.voltaN - st.voltaSim, " não voltaria", " não voltariam") : "Sem respostas", minibar([{ n: st.voltaSim, cls: "c-ok", label: "Voltariam" }, { n: st.voltaN - st.voltaSim, cls: "c-no", label: "Não voltariam" }]))
     ].filter(Boolean));
     host.appendChild(strip);
@@ -883,7 +887,9 @@
       }));
     }
     var dimsAll = DIM.map(function (d) { var a = answered(resp, d[0]); return { n: a.length, g: goodN(a, d[0]) }; }).filter(function (d) { return d.n; });
-    var avgPos = dimsAll.length ? Math.round(dimsAll.reduce(function (s, d) { return s + d.g / d.n; }, 0) / dimsAll.length * 100) : null;
+    // Média ponderada pelo número de respostas de cada dimensão
+    var sumN = dimsAll.reduce(function (s, d) { return s + d.n; }, 0), sumG = dimsAll.reduce(function (s, d) { return s + d.g; }, 0);
+    var avgPos = pct(sumG, sumN);
     mods.push(mod("exp", "Experiência", fmt(avgPos, "%"), ex ? "positivas em média · pior: " + ex.worst.label + " (" + ex.worst.p + "%)" : "positivas em média", minibar(ESCALA.map(function (k, i) { return { n: DIM.reduce(function (s, d) { return s + resp.filter(function (x) { return x[d[0]] === k; }).length; }, 0), cls: "s" + (i + 1), label: k }; })), function () { return expTable(resp); }));
     if (st.npsN) mods.push(mod("nps", "Recomendação (eNPS)", (st.nps > 0 ? "+" : "") + st.nps, st.npsN + pl(st.npsN, " nota · ", " notas · ") + np(st.det, st.npsN) + pl(st.det, " detrator", " detratores"), minibar([{ n: st.pro, cls: "c-pro", label: "Promotores" }, { n: st.neu, cls: "c-neu", label: "Neutros" }, { n: st.det, cls: "c-det", label: "Detratores" }]), function () { return npsBlock(st, list); }));
     var fb = answered(resp, "feedback"), fb0 = fb.filter(function (x) { return x.feedback === "Nenhuma vez"; }).length;
@@ -960,13 +966,25 @@
       ver.addEventListener("click", function () { openId = openId === x.id ? null : x.id; renderResp(); });
       acts.push(ver);
       if (me && me.is_admin) {
-        var del = el("button", { class: "lnk" + (armed === x.id ? " danger" : ""), type: "button", text: armed === x.id ? "Confirmar exclusão" : "Excluir" });
+        // Exclusão em dois passos: o 1º clique pede confirmação (15 s, com aviso); o 2º exclui e confirma na tela.
+        var del = el("button", { class: armed === x.id ? "btn sm danger" : "lnk", type: "button", text: armed === x.id ? "Confirmar exclusão" : "Excluir" });
         del.addEventListener("click", function () {
-          if (armed !== x.id) { armed = x.id; renderResp(); setTimeout(function () { if (armed === x.id) { armed = null; renderResp(); } }, 4000); return; }
-          armed = null; del.disabled = true;
-          store.remove(x.id).then(loadEntries).catch(function (err) { warn("Não foi possível excluir. " + ((err && err.message) || "")); renderResp(); });
+          if (armed !== x.id) {
+            armed = x.id; renderResp();
+            say("Clique em “Confirmar exclusão” para excluir a entrevista de " + (x.colaborador || "colaborador") + ". Depois de excluída, ela não pode ser recuperada.");
+            setTimeout(function () { if (armed === x.id) { armed = null; say(""); renderResp(); } }, 15000);
+            return;
+          }
+          armed = null; del.disabled = true; del.textContent = "Excluindo…";
+          store.remove(x.id).then(function () { say("Entrevista de " + (x.colaborador || "colaborador") + " excluída."); return loadEntries(); })
+            .catch(function (err) { say(""); warn("Não foi possível excluir. " + ((err && err.message) || "")); renderResp(); });
         });
         acts.push(del);
+        if (armed === x.id) {
+          var cancel = el("button", { class: "lnk", type: "button", text: "Cancelar" });
+          cancel.addEventListener("click", function () { armed = null; say(""); renderResp(); });
+          acts.push(cancel);
+        }
       }
       var dt = el("td", { text: brDate(entryDate(x)) });
       if (x.origem === "Base 2024") dt.appendChild(el("span", { class: "tag", text: "2024" }));

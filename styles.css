@@ -51,7 +51,10 @@ body {
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: 0;
 }
-.wrap { max-width: 880px; margin: 0 auto; }
+/* Layout fluido: ocupa a tela (até 1840px em monitores muito largos), com margem que cresce com a tela */
+.wrap { max-width: 1840px; margin: 0 auto; padding-inline: clamp(0px, 2.5vw, 40px); }
+/* O formulário mantém largura de leitura confortável */
+#p-nova form, #p-nova .done { max-width: 920px; }
 header.top { padding-block: 32px 8px; display: flex; flex-direction: column; gap: 20px; }
 .toprow { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
 .who { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 14px; flex-wrap: wrap; }
@@ -283,7 +286,7 @@ footer { padding-block: 40px 56px; color: var(--muted); font-size: 13px; }
 
 /* Módulos: cartões que abrem o detalhe */
 .mods-h { font-size: 20px; font-weight: 600; margin: 36px 0 2px; }
-.mods { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-top: 12px; }
+.mods { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-top: 12px; }
 .mod-c { width: 100%; height: 100%; text-align: left; font: inherit; color: var(--fg); cursor: pointer; display: flex; flex-direction: column; gap: 6px; padding: 16px 18px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg); transition: border-color .15s, transform .15s, box-shadow .15s; }
 .mod-c:hover { border-color: var(--sel-line); transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0, 0, 0, .08); }
 .mod.on .mod-c { border-color: var(--sel-line); background: var(--bg-alt); box-shadow: inset 0 0 0 1px var(--sel-line); }
@@ -308,3 +311,5 @@ footer { padding-block: 40px 56px; color: var(--muted); font-size: 13px; }
   .mod-p { padding: 4px 14px 16px; }
 }
 .mod-v.txt { font-size: 20px; line-height: 1.25; }
+.btn.danger { background: var(--err); color: #FFFFFF; }
+.kpi-w { display: block; margin-top: 6px; color: var(--err); font-weight: 600; font-size: 12px; }
