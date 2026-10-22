@@ -502,6 +502,8 @@
   }
   function pl(n, um, varios) { return n === 1 ? um : varios; }
   function outroTxt(l) { return l === "Outro" ? "Outro (textos variados)" : l; }
+  // Número com sinal tipográfico: +33, 0, −55 (o mesmo sinal de menos da escala do medidor)
+  function signed(v) { return v > 0 ? "+" + v : v < 0 ? "−" + Math.abs(v) : "0"; }
   // Agrupa respostas ("Outro: ..." vira "Outro"; grafias iguais juntas). Devolve [{label, n}] e o total.
   // text: resposta aberta (padroniza maiúsculas e escolhe a grafia com acento).
   function tally(list, get, order, text) {
@@ -800,20 +802,38 @@
     });
     return svg(42, 42, kids);
   }
-  // Medidor de -100 a +100 para o eNPS; o ponteiro gira até o valor e acompanha as mudanças.
-  function gauge(v) {
-    var cx = 60, cy = 62, R = 48;
-    var a = function (x) { var t = Math.PI * (1 - (x + 100) / 200); return [cx + R * Math.cos(t), cy - R * Math.sin(t)]; };
-    var arc = function (x0, x1, cls) { var p0 = a(x0), p1 = a(x1); return sv("path", { d: "M" + p0[0] + " " + p0[1] + " A" + R + " " + R + " 0 0 1 " + p1[0] + " " + p1[1], class: "gg " + cls }); };
-    var t = function (x, y, s, anchor) { var n = sv("text", { x: x, y: y, class: "gg-t", "text-anchor": anchor }); n.textContent = s; return n; };
-    var kids = [arc(-100, 0, "gg-d"), arc(0, 50, "gg-n"), arc(50, 100, "gg-p"), t(cx - R, cy + 12, "−100", "middle"), t(cx, 8, "0", "middle"), t(cx + R, cy + 12, "+100", "middle")];
+  // Medidor do eNPS (−100 a +100). Geometria num lugar só; o marcador gira em torno do centro do arco,
+  // com o ângulo calculado do valor: −100 → −90°, 0 → 0°, +100 → +90°. O número fica dentro do arco.
+  var GAUGE = { w: 264, h: 146, cx: 132, cy: 126, r: 88, label: 27, min: -100, max: 100 };
+  function gaugeAngle(v) { var c = Math.max(GAUGE.min, Math.min(GAUGE.max, v)); return ((c - GAUGE.min) / (GAUGE.max - GAUGE.min)) * 180 - 90; }
+  function gaugePoint(v, r) { var a = gaugeAngle(v) * Math.PI / 180; return [GAUGE.cx + r * Math.sin(a), GAUGE.cy - r * Math.cos(a)]; }
+  function gauge(v, n) {
+    var G = GAUGE, gap = 1.5;
+    var arc = function (x0, x1, cls) {
+      var p0 = gaugePoint(x0 + gap, G.r), p1 = gaugePoint(x1 - gap, G.r);
+      return sv("path", { d: "M" + p0[0].toFixed(2) + " " + p0[1].toFixed(2) + " A" + G.r + " " + G.r + " 0 0 1 " + p1[0].toFixed(2) + " " + p1[1].toFixed(2), class: "gg " + cls });
+    };
+    var kids = [arc(-100, 0, "gg-d"), arc(0, 50, "gg-n"), arc(50, 100, "gg-p")];
+    [-100, -50, 0, 50, 100].forEach(function (x) {
+      var p = gaugePoint(x, G.r + G.label), t = sv("text", { x: p[0].toFixed(1), y: (p[1] + (Math.abs(x) === 100 ? 14 : 4)).toFixed(1), class: "gg-t", "text-anchor": "middle" });
+      t.textContent = x > 0 ? "+" + x : x < 0 ? "−" + Math.abs(x) : "0";
+      kids.push(t);
+    });
     if (v !== null) {
-      var needle = sv("line", { x1: cx, y1: cy, x2: cx, y2: cy - R + 6, class: "gg-h" });
-      grow(needle, "gauge", "transform", "rotate(" + (Math.max(-100, Math.min(100, v)) * 0.9) + "deg)", "rotate(-90deg)");
-      kids.push(needle, sv("circle", { cx: cx, cy: cy, r: 5, class: "gg-c" }));
+      // Marcador no topo do arco, girado em torno do centro: fica exatamente sobre o valor na escala.
+      var m = sv("g", { class: "gg-m" });
+      m.appendChild(sv("circle", { cx: G.cx, cy: G.cy - G.r, r: 7, class: "gg-dot" }));
+      // Triângulo do lado de dentro do arco, apontando para ele (não esbarra nas marcas da escala nem no número)
+      m.appendChild(sv("path", { d: "M" + (G.cx - 6) + " " + (G.cy - G.r + 24) + " L" + (G.cx + 6) + " " + (G.cy - G.r + 24) + " L" + G.cx + " " + (G.cy - G.r + 13) + " Z", class: "gg-tri" }));
+      m.style.transformOrigin = G.cx + "px " + G.cy + "px";
+      grow(m, "gauge", "transform", "rotate(" + gaugeAngle(v) + "deg)", "rotate(-90deg)");
+      kids.push(m);
     }
-    var s = svg(120, 76, kids); s.setAttribute("class", "gauge"); return s;
+    var s = svg(G.w, G.h, kids); s.setAttribute("class", "gauge");
+    var val = el("div", { class: "gauge-v" }, [el("b", { text: v === null ? "–" : signed(v) }), el("span", { text: n ? n + pl(n, " nota", " notas") : "sem notas" })]);
+    return el("div", { class: "gauge-w", role: "img", "aria-label": v === null ? "eNPS sem notas" : "eNPS " + v + " numa escala de −100 a +100" }, [s, val]);
   }
+  if (DEMO) window.__wapTest = { gauge: gauge, gaugeAngle: gaugeAngle, gaugePoint: gaugePoint, GAUGE: GAUGE }; // só no modo demonstração, para validar o medidor
   // Barrinha empilhada para os cartões: partes [{n, cls, label}]
   function minibar(parts, key) {
     var tot = parts.reduce(function (a, p) { return a + p.n; }, 0), b = el("div", { class: "mb" });
@@ -826,17 +846,30 @@
     });
     return b;
   }
-  function legendRow(parts) {
+  // Lista dos cartões: uma linha por categoria (cor · rótulo · quantidade e %), números alinhados à direita.
+  // big: % em destaque na cor da categoria (cartão do eNPS).
+  function legendRow(parts, big) {
     var tot = parts.reduce(function (a, p) { return a + p.n; }, 0);
-    return el("div", { class: "kl" }, parts.map(function (p) { return el("span", null, [el("i", { class: p.cls }), document.createTextNode(p.label + " " + np(p.n, tot))]); }));
+    return el("ul", { class: "kl" + (big ? " kl-big" : "") }, parts.map(function (p) {
+      var pc = tot ? Math.round((p.n / tot) * 100) : 0;
+      return el("li", null, big
+        ? [el("i", { class: p.cls }), el("b", { class: "kl-p t-" + p.cls, text: pc + "%" }), el("span", { class: "kl-n", text: p.label }), el("span", { class: "kl-v", text: String(p.n) })]
+        : [el("i", { class: p.cls }), el("span", { class: "kl-n", text: p.label }), el("span", { class: "kl-v", text: p.n + " (" + pc + "%)" })]);
+    }));
   }
   function months12(list) {
     var now = new Date(), keys = [];
     for (var i = 11; i >= 0; i--) { var d = new Date(now.getFullYear(), now.getMonth() - i, 1); keys.push(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0")); }
     return keys.map(function (k) { return { k: k, n: list.filter(function (x) { return entryDate(x).slice(0, 7) === k; }).length }; });
   }
+  // Cartão de indicador, padrão único (referência: Voluntárias):
+  // rótulo · número principal + gráfico em área fixa · lista ou texto de apoio.
   function kpi(cls, label, value, sub, viz) {
-    return el("div", { class: "kpi " + (cls || "") }, [el("span", { class: "kpi-l", text: label }), el("div", { class: "kpi-r" }, [el("b", { class: "kpi-v", text: value }), viz || null]), sub ? el("div", { class: "kpi-s" }, [typeof sub === "string" ? document.createTextNode(sub) : sub]) : null]);
+    return el("div", { class: "kpi " + (cls || "") }, [
+      el("span", { class: "kpi-l", text: label }),
+      el("div", { class: "kpi-r" }, [el("b", { class: "kpi-v", text: value }), viz ? el("div", { class: "kpi-viz" }, [viz]) : null]),
+      sub ? el("div", { class: "kpi-s" }, [typeof sub === "string" ? document.createTextNode(sub) : sub]) : null
+    ]);
   }
 
   // Módulo: cartão com o número principal; ao clicar, abre o detalhe em largura total (um por vez).
@@ -883,16 +916,29 @@
     if (ex) pts.push(["Experiência mais bem avaliada: ", [ex.best.label], ", com " + np(ex.best.g, ex.best.n) + " bom ou excelente; a mais mal avaliada: ", [ex.worst.label], ", com " + np(ex.worst.g, ex.worst.n) + "."]);
     host.appendChild(insight(T.cor, T.rotulo, lead, pts));
 
-    // 2. Faixa de indicadores com mini-gráficos
+    // 2. Faixa de indicadores: mesmo padrão de cartão para todos (referência: Voluntárias)
     var m12 = months12(list), lastM = m12[m12.length - 1], prevM = m12[m12.length - 2];
     var comp = [{ n: st.nVol, cls: "c-vol", label: "Voluntárias" }, { n: st.nInv, cls: "c-inv", label: "Involuntárias" }].concat(st.nSem ? [{ n: st.nSem, cls: "c-sem", label: "Sem iniciativa" }] : []);
-    var strip = el("div", { class: "kpis" }, [
-      kpi("", t ? T.titulo : "Saídas", String(st.n), t ? nOf(st.n, base.n) + " do total" : "Últimos 12 meses · " + MESES[Number(lastM.k.slice(5)) - 1] + ": " + lastM.n + (prevM ? " (mês anterior: " + prevM.n + ")" : ""), spark(m12.map(function (x) { return x.n; }))),
-      !t ? kpi("", "Voluntárias", fmt(pct(st.nVol, st.n), "%"), legendRow(comp), donut(comp)) : null,
-      kpi("", "Aceitaram a entrevista", fmt(st.adesao, "%"), nOf(st.nResp, st.n) + " · " + (st.n - st.nResp) + pl(st.n - st.nResp, " recusou", " recusaram"), minibar([{ n: st.nResp, cls: "c-ok", label: "Aceitaram" }, { n: st.n - st.nResp, cls: "c-no", label: "Recusaram" }])),
-      kpi("kpi-nps", "eNPS", st.npsN ? (st.nps > 0 ? "+" : "") + st.nps : "–", st.npsN ? el("div", null, [legendRow([{ n: st.pro, cls: "c-pro", label: "Promotores" }, { n: st.neu, cls: "c-neu", label: "Neutros" }, { n: st.det, cls: "c-det", label: "Detratores" }]),
-        st.npsN < 20 ? el("span", { class: "kpi-w", text: "Base pequena: " + st.npsN + pl(st.npsN, " nota", " notas") + ". Leia com cautela." }) : null]) : "Sem notas no filtro (a base 2024 não tinha esta pergunta)", gauge(st.npsN ? st.nps : null)),
-      kpi("", "Voltariam a trabalhar na WAP", fmt(st.volta, "%"), st.voltaN ? nOf(st.voltaSim, st.voltaN) + " · " + (st.voltaN - st.voltaSim) + pl(st.voltaN - st.voltaSim, " não voltaria", " não voltariam") : "Sem respostas", minibar([{ n: st.voltaSim, cls: "c-ok", label: "Voltariam" }, { n: st.voltaN - st.voltaSim, cls: "c-no", label: "Não voltariam" }]))
+    var aceit = [{ n: st.nResp, cls: "c-ok", label: "Aceitaram" }, { n: st.n - st.nResp, cls: "c-no", label: pl(st.n - st.nResp, "Recusou", "Recusaram") }];
+    var volta = [{ n: st.voltaSim, cls: "c-ok", label: "Voltariam" }, { n: st.voltaN - st.voltaSim, cls: "c-no", label: "Não voltariam" }];
+    var npsParts = [{ n: st.pro, cls: "c-pro", label: "Promotores" }, { n: st.neu, cls: "c-neu", label: "Neutros" }, { n: st.det, cls: "c-det", label: "Detratores" }];
+    var saidasSub = el("div", { class: "kpi-trend" }, [spark(m12.map(function (x) { return x.n; })),
+      el("span", { text: t ? nOf(st.n, base.n) + " do total" : "Últimos 12 meses · " + MESES[Number(lastM.k.slice(5)) - 1] + ": " + lastM.n + (prevM ? " (anterior: " + prevM.n + ")" : "") })]);
+    var npsCard = el("div", { class: "kpi kpi-nps" }, [
+      el("span", { class: "kpi-l", text: "eNPS · recomendação" }),
+      el("div", { class: "nps-body" }, [
+        gauge(st.npsN ? st.nps : null, st.npsN),
+        st.npsN ? el("div", { class: "nps-side" }, [legendRow(npsParts, true),
+          el("p", { class: "kpi-s" + (st.npsN < 20 ? " kpi-w" : ""), text: (st.npsN < 20 ? "Base pequena: " : "Base: ") + st.npsN + pl(st.npsN, " nota", " notas") + (st.npsN < 20 ? ". Leia com cautela." : ". eNPS = % promotores − % detratores.") })])
+          : el("p", { class: "kpi-s", text: "Sem notas no filtro. A base 2024 não tinha esta pergunta; o eNPS vem das entrevistas do V2." })
+      ])
+    ]);
+    var strip = el("div", { class: "kpis" + (t ? " kpis-4" : "") }, [
+      kpi("", t ? T.titulo : "Saídas", String(st.n), saidasSub, null),
+      !t ? kpi("", "Voluntárias", fmt(pct(st.nVol, st.n), "%"), legendRow(comp), donut(comp, "dn-comp")) : null,
+      kpi("", "Aceitaram a entrevista", fmt(st.adesao, "%"), legendRow(aceit), donut(aceit, "dn-aceit")),
+      kpi("", "Voltariam a trabalhar na WAP", fmt(st.volta, "%"), st.voltaN ? legendRow(volta) : "Sem respostas", st.voltaN ? donut(volta, "dn-volta") : null),
+      npsCard
     ].filter(Boolean));
     host.appendChild(strip);
 
@@ -916,7 +962,7 @@
     var sumN = dimsAll.reduce(function (s, d) { return s + d.n; }, 0), sumG = dimsAll.reduce(function (s, d) { return s + d.g; }, 0);
     var avgPos = pct(sumG, sumN);
     mods.push(mod("exp", "Experiência", fmt(avgPos, "%"), ex ? "positivas em média · pior: " + ex.worst.label + " (" + ex.worst.p + "%)" : "positivas em média", minibar(ESCALA.map(function (k, i) { return { n: DIM.reduce(function (s, d) { return s + resp.filter(function (x) { return x[d[0]] === k; }).length; }, 0), cls: "s" + (i + 1), label: k }; })), function () { return expTable(resp); }));
-    if (st.npsN) mods.push(mod("nps", "Recomendação (eNPS)", (st.nps > 0 ? "+" : "") + st.nps, st.npsN + pl(st.npsN, " nota · ", " notas · ") + np(st.det, st.npsN) + pl(st.det, " detrator", " detratores"), minibar([{ n: st.pro, cls: "c-pro", label: "Promotores" }, { n: st.neu, cls: "c-neu", label: "Neutros" }, { n: st.det, cls: "c-det", label: "Detratores" }]), function () { return npsBlock(st, list); }));
+    if (st.npsN) mods.push(mod("nps", "Recomendação (eNPS)", signed(st.nps), st.npsN + pl(st.npsN, " nota · ", " notas · ") + np(st.det, st.npsN) + pl(st.det, " detrator", " detratores"), minibar([{ n: st.pro, cls: "c-pro", label: "Promotores" }, { n: st.neu, cls: "c-neu", label: "Neutros" }, { n: st.det, cls: "c-det", label: "Detratores" }]), function () { return npsBlock(st, list); }));
     var fb = answered(resp, "feedback"), fb0 = fb.filter(function (x) { return x.feedback === "Nenhuma vez"; }).length;
     mods.push(mod("fb", "Feedback do gestor", fb.length ? pct(fb0, fb.length) + "%" : "–", fb.length ? "sem nenhum feedback em 6 meses · " + nOf(fb0, fb.length) : "Sem respostas", minibar(FEEDBACK.map(function (k, i) { return { n: fb.filter(function (x) { return x.feedback === k; }).length, cls: "f" + i, label: k }; })), function () {
       var w = el("div"); w.appendChild(bars("Feedback do gestor nos últimos 6 meses", "Na base 2024 a pergunta era “recebeu feedbacks no período?” (Nunca / Às vezes / Sempre), convertida de forma aproximada.", resp, field("feedback"), { id: "fb", order: FEEDBACK })); return w;
