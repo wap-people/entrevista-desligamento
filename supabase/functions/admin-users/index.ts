@@ -2,8 +2,11 @@
 // Só administradores ativos (public.members.is_admin) podem chamar.
 // Publicada com verify_jwt = false: a própria função confere a sessão (auth.getUser) e o papel de admin.
 // Ações (POST JSON):
-//   { action: "create", email, password, full_name, is_admin }
+//   { action: "invite", email, full_name, is_admin, redirect_to? }  cria o usuário sem senha e devolve o link de convite
+//   { action: "link", user_id, redirect_to? }                       devolve um link para a pessoa criar uma nova senha
+//   { action: "create", email, password, full_name, is_admin }      (antigo: com senha provisória)
 //   { action: "update", user_id, full_name?, is_admin?, active?, password? }
+// Os links NÃO são enviados por e-mail pelo Supabase: a administradora os envia pelo próprio Outlook.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -18,6 +21,13 @@ function json(body: unknown, status = 200) {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Para onde o link leva depois de validado: só o site publicado ou um servidor local de teste.
+const SITE = "https://wap-people.github.io/entrevista-desligamento/";
+function destino(v: unknown): string {
+  const s = String(v || "");
+  return /^https:\/\/wap-people\.github\.io\/entrevista-desligamento\/?$/.test(s) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/.test(s) ? s : SITE;
+}
 
 // Chave de servidor: a nova (SUPABASE_SECRET_KEYS, JSON { nome: "sb_secret_..." }) ou a legada (service_role).
 function serverKey(): string {
@@ -47,6 +57,43 @@ Deno.serve(async (req) => {
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: "Requisição inválida." }, 400); }
+
+  if (body.action === "invite") {
+    const email = String(body.email || "").trim().toLowerCase();
+    const fullName = String(body.full_name || "").trim();
+    const isAdmin = body.is_admin === true;
+    if (!EMAIL_RE.test(email)) return json({ error: "E-mail inválido." }, 400);
+    if (!fullName) return json({ error: "Informe o nome." }, 400);
+
+    const { data: gen, error } = await admin.auth.admin.generateLink({
+      type: "invite", email, options: { data: { full_name: fullName }, redirectTo: destino(body.redirect_to) },
+    });
+    if (error || !gen?.user || !gen.properties?.action_link) {
+      const msg = /already|registered|exists/i.test(error?.message || "")
+        ? "Já existe um usuário com este e-mail. Use “Link de nova senha” na lista abaixo."
+        : ("Não foi possível criar o convite: " + (error?.message || "erro"));
+      return json({ error: msg }, 400);
+    }
+    const { error: mErr } = await admin.from("members").upsert({
+      user_id: gen.user.id, email, full_name: fullName, is_admin: isAdmin, active: true, created_by: callerId,
+    });
+    if (mErr) return json({ error: "Convite criado, mas falhou ao registrar o acesso: " + mErr.message }, 500);
+    return json({ ok: true, user_id: gen.user.id, link: gen.properties.action_link });
+  }
+
+  if (body.action === "link") {
+    const userId = String(body.user_id || "");
+    if (!userId) return json({ error: "Usuário não informado." }, 400);
+    const { data: u, error: uErr } = await admin.auth.admin.getUserById(userId);
+    if (uErr || !u?.user?.email) return json({ error: "Usuário não encontrado." }, 404);
+    const { data: m } = await admin.from("members").select("active").eq("user_id", userId).maybeSingle();
+    if (!m || !m.active) return json({ error: "Este usuário está desativado. Reative antes de enviar um link." }, 400);
+    const { data: gen, error } = await admin.auth.admin.generateLink({
+      type: "recovery", email: u.user.email, options: { redirectTo: destino(body.redirect_to) },
+    });
+    if (error || !gen?.properties?.action_link) return json({ error: "Não foi possível gerar o link: " + (error?.message || "erro") }, 400);
+    return json({ ok: true, link: gen.properties.action_link });
+  }
 
   if (body.action === "create") {
     const email = String(body.email || "").trim().toLowerCase();

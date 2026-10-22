@@ -228,7 +228,13 @@
       draftGet: function () { return ok(draft); },
       draftSave: function (dados) { draft = { dados: JSON.parse(JSON.stringify(dados)), atualizado_em: new Date().toISOString() }; return ok(); },
       draftDelete: function () { draft = null; return ok(); },
-      admin: function () { return Promise.reject({ message: "Indisponível no modo demonstração." }); }
+      // convite e link de nova senha funcionam com um link de exemplo, que não dá acesso a nada
+      admin: function (p) {
+        var link = location.origin + location.pathname + "?demo=1#link-de-exemplo-do-modo-demonstracao";
+        if (p.action === "invite") { users.push({ user_id: "demo-" + (++seq), email: p.email, full_name: p.full_name, is_admin: !!p.is_admin, active: true }); return ok({ ok: true, link: link }); }
+        if (p.action === "link") return ok({ ok: true, link: link });
+        return Promise.reject({ message: "Indisponível no modo demonstração." });
+      }
     };
   }
 
@@ -1741,7 +1747,6 @@
   document.addEventListener("click", function (e) { var d = $("#dlmenu"); if (d.open && !d.contains(e.target)) d.open = false; });
 
   /* ---------- Usuários (só admins) ---------- */
-  var pwFor = null;
   function usrSay(msg, isErr) { var m = $("#usrmsg"); m.textContent = msg || ""; m.className = "notice " + (isErr ? "warn" : "ok"); m.hidden = !msg; }
 
   function loadMembers() {
@@ -1760,7 +1765,7 @@
 
   function adminCall(payload, okMsg) {
     usrSay("");
-    return store.admin(payload).then(function () { usrSay(okMsg); pwFor = null; loadUsers(); })
+    return store.admin(payload).then(function () { usrSay(okMsg); loadUsers(); })
       .catch(function (err) { usrSay((err && err.message) || "Não foi possível concluir.", true); });
   }
 
@@ -1773,9 +1778,17 @@
       if (m.is_admin) name.appendChild(el("span", { class: "tag", text: "admin" }));
       if (!m.active) name.appendChild(el("span", { class: "tag", text: "inativo" }));
       var acts = [];
-      var pw = el("button", { class: "lnk", type: "button", text: pwFor === m.user_id ? "Cancelar" : "Nova senha" });
-      pw.addEventListener("click", function () { pwFor = pwFor === m.user_id ? null : m.user_id; renderUsers(list); });
-      acts.push(pw);
+      if (m.active) {
+        var pw = el("button", { class: "lnk", type: "button", text: "Link de nova senha" });
+        pw.addEventListener("click", function () {
+          usrSay(""); pw.disabled = true; pw.textContent = "Gerando…";
+          store.admin({ action: "link", user_id: m.user_id, redirect_to: location.origin + location.pathname })
+            .then(function (r) { mostrarConvite("senha", m.full_name || m.email, m.email, r.link); })
+            .catch(function (err) { usrSay((err && err.message) || "Não foi possível gerar o link.", true); })
+            .then(function () { pw.disabled = false; pw.textContent = "Link de nova senha"; });
+        });
+        acts.push(pw);
+      }
       if (!self) {
         var adm = el("button", { class: "lnk", type: "button", text: m.is_admin ? "Tirar admin" : "Tornar admin" });
         adm.addEventListener("click", function () { adminCall({ action: "update", user_id: m.user_id, is_admin: !m.is_admin }, "Permissão atualizada."); });
@@ -1784,15 +1797,6 @@
         acts.push(adm, act);
       }
       tb.appendChild(el("tr", { class: m.active ? "" : "off" }, [name, el("td", { text: m.email }), el("td", { class: "act" }, acts)]));
-      if (pwFor === m.user_id) {
-        var inp = el("input", { type: "password", autocomplete: "new-password", placeholder: "Nova senha (mín. 8 caracteres)" });
-        var save = el("button", { class: "btn sm", type: "button", text: "Salvar senha" });
-        save.addEventListener("click", function () {
-          if (inp.value.length < 8) { usrSay("A senha precisa ter pelo menos 8 caracteres.", true); return; }
-          adminCall({ action: "update", user_id: m.user_id, password: inp.value }, "Senha alterada. Informe a nova senha à pessoa por um canal seguro.");
-        });
-        tb.appendChild(el("tr", { class: "det" }, [el("td", { colspan: "3" }, [el("div", { class: "row" }, [inp, save])])]));
-      }
     });
     var head = ["Nome", "E-mail", ""].map(function (h) { return el("th", { text: h }); });
     host.appendChild(el("div", { class: "tw" }, [el("table", null, [el("thead", null, [el("tr", null, head)]), tb])]));
@@ -1823,15 +1827,55 @@
     host.appendChild(el("div", { class: "tw" }, [el("table", null, [el("thead", null, [el("tr", null, head)]), tb])]));
   }
 
+  // Novo usuário por convite: o servidor cria o acesso sem senha e devolve um link pessoal;
+  // a administradora envia o e-mail pelo próprio Outlook (nenhum serviço de e-mail é usado).
   $("#newUser").addEventListener("submit", function (e) {
     e.preventDefault();
-    var name = $("#nuName").value.trim(), email = $("#nuEmail").value.trim(), pass = $("#nuPass").value;
+    var name = nomeProprio($("#nuName").value), email = $("#nuEmail").value.trim().toLowerCase();
     if (!name || !email) { usrSay("Informe nome e e-mail.", true); return; }
-    if (pass.length < 8) { usrSay("A senha precisa ter pelo menos 8 caracteres.", true); return; }
-    var btn = $("#nuBtn"); btn.disabled = true;
-    adminCall({ action: "create", email: email, password: pass, full_name: name, is_admin: $("#nuAdmin").checked }, "Usuário criado. Passe a senha provisória por um canal seguro.")
-      .then(function () { if (!$("#usrmsg").classList.contains("warn")) $("#newUser").reset(); btn.disabled = false; });
+    var btn = $("#nuBtn"); btn.disabled = true; btn.textContent = "Criando…"; usrSay("");
+    store.admin({ action: "invite", email: email, full_name: name, is_admin: $("#nuAdmin").checked, redirect_to: location.origin + location.pathname })
+      .then(function (r) { $("#newUser").reset(); mostrarConvite("convite", name, email, r.link); loadUsers(); })
+      .catch(function (err) { usrSay((err && err.message) || "Não foi possível criar o usuário.", true); })
+      .then(function () { btn.disabled = false; btn.textContent = "Criar e preparar convite"; });
   });
+
+  var SITE_URL = "https://wap-people.github.io/entrevista-desligamento/";
+  function textoConvite(tipo, nome, email, link) {
+    var primeiro = String(nome || "").split(" ")[0];
+    var assunto = tipo === "convite" ? "Seu acesso à Entrevista de Desligamento V2" : "Nova senha · Entrevista de Desligamento V2";
+    var corpo = (primeiro ? "Olá, " + primeiro + "!" : "Olá!") + "\n\n" +
+      (tipo === "convite"
+        ? "Você recebeu acesso ao sistema Entrevista de Desligamento V2, do time de People da WAP.\n\nPara entrar pela primeira vez, abra o link abaixo e crie a sua senha:\n"
+        : "Para criar uma nova senha no sistema Entrevista de Desligamento V2, abra o link abaixo:\n") +
+      link + "\n\n" +
+      "O link é pessoal, só funciona uma vez e vale por tempo limitado. Se ele expirar, me avise que eu envio outro.\n\n" +
+      "Depois disso, o acesso é sempre por " + SITE_URL + "\nSeu login é este e-mail: " + email + "\n\n" +
+      (me && me.full_name ? me.full_name : "");
+    return { assunto: assunto, corpo: corpo };
+  }
+  // Painel com a mensagem pronta: abrir no Outlook (aplicativo ou web) ou copiar
+  function mostrarConvite(tipo, nome, email, link) {
+    var box = $("#convite"), t = textoConvite(tipo, nome, email, link);
+    box.textContent = "";
+    var q = "?to=" + encodeURIComponent(email) + "&subject=" + encodeURIComponent(t.assunto) + "&body=" + encodeURIComponent(t.corpo);
+    var app = el("a", { class: "btn sm", href: "mailto:" + encodeURIComponent(email) + "?subject=" + encodeURIComponent(t.assunto) + "&body=" + encodeURIComponent(t.corpo), text: "Abrir no Outlook" });
+    var web = el("a", { class: "btn sm ghost", href: "https://outlook.office.com/mail/deeplink/compose" + q, target: "_blank", rel: "noopener", text: "Abrir no Outlook na web" });
+    var cp = el("button", { class: "lnk", type: "button", text: "Copiar mensagem" });
+    cp.addEventListener("click", function () {
+      var txt = "Assunto: " + t.assunto + "\n\n" + t.corpo;
+      (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { cp.textContent = "Mensagem copiada"; }, function () { pre.focus(); cp.textContent = "Selecione o texto abaixo e copie"; });
+    });
+    var fechar = el("button", { class: "lnk", type: "button", text: "Fechar" });
+    fechar.addEventListener("click", function () { box.hidden = true; box.textContent = ""; });
+    var pre = el("textarea", { class: "convite-txt", readonly: "", rows: "12", "aria-label": "Mensagem pronta" }); pre.value = "Assunto: " + t.assunto + "\n\n" + t.corpo;
+    box.appendChild(el("p", { class: "convite-h", text: (tipo === "convite" ? "Usuário criado. " : "Link gerado. ") + "Falta enviar o e-mail para " + email + "." }));
+    box.appendChild(el("p", { class: "hint", text: "Confira a mensagem e clique em Enviar no Outlook. O link é pessoal: não compartilhe em grupos." }));
+    box.appendChild(el("div", { class: "row" }, [app, web, cp, fechar]));
+    box.appendChild(pre);
+    box.hidden = false;
+    box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
 
   /* ---------- Lista de gestores: atualização pelo relatório do TOTVS (só admins) ----------
      O XML (planilha do Excel 2003 exportada do TOTVS) é lido no navegador. Só nome, cargo, área e unidade
@@ -1906,8 +1950,31 @@
 
   /* ---------- Login e início ---------- */
   function showAuth(msg) {
-    $("#app").hidden = true; $("#auth").hidden = false;
+    $("#app").hidden = true; $("#auth").hidden = false; $("#loginForm").hidden = false; $("#pwSetForm").hidden = true;
     var m = $("#loginMsg"); m.textContent = msg || ""; m.hidden = !msg;
+  }
+
+  // Quem chega por um link de convite ou de nova senha: o Supabase devolve a sessão no endereço
+  // (#...type=invite ou type=recovery). Antes de entrar, a pessoa cria a senha.
+  var LINK = /[#&]type=(invite|recovery)\b/.exec(location.hash), LINK_ERRO = /[#&]error_code=([^&]+)/.exec(location.hash);
+  var precisaSenha = !!LINK;
+  function limparEndereco() { if (location.hash) history.replaceState(null, "", location.pathname + location.search); }
+  function showPwSet(member) {
+    $("#app").hidden = true; $("#auth").hidden = false; $("#loginForm").hidden = true; $("#pwSetForm").hidden = false;
+    $("#pwSetSub").textContent = (LINK && LINK[1] === "invite" ? "Boas-vindas, " : "Olá, ") + (member.full_name || member.email) + ". Crie a senha que você vai usar para entrar com o e-mail " + member.email + ".";
+    $("#pwSetForm").onsubmit = function (e) {
+      e.preventDefault();
+      var a = $("#pwNew").value, b = $("#pwNew2").value, msg = $("#pwSetMsg");
+      var erro = a.length < 8 ? "A senha precisa ter pelo menos 8 caracteres." : a !== b ? "As duas senhas não são iguais." : "";
+      msg.textContent = erro; msg.hidden = !erro; if (erro) return;
+      var btn = $("#pwSetBtn"); btn.disabled = true; btn.textContent = "Salvando";
+      sb.auth.updateUser({ password: a }).then(function (r) {
+        btn.disabled = false; btn.textContent = "Salvar senha e entrar";
+        if (r.error) { msg.textContent = "Não foi possível salvar: " + r.error.message; msg.hidden = false; return; }
+        precisaSenha = false; limparEndereco(); $("#pwSetForm").reset(); enter(member);
+      });
+    };
+    setTimeout(function () { $("#pwNew").focus(); }, 0);
   }
 
   function enter(member) {
@@ -1932,6 +1999,7 @@
         showAuth("Seu usuário não tem acesso a este sistema. Fale com uma administradora.");
         return;
       }
+      if (precisaSenha) { showPwSet(r.data); return; }
       if (!me || me.user_id !== r.data.user_id) enter(r.data);
     });
   }
@@ -1956,7 +2024,15 @@
   if (!CFG.SUPABASE_URL || !CFG.SUPABASE_ANON_KEY || /COLE_AQUI/.test(CFG.SUPABASE_ANON_KEY) || !window.supabase) { $("#cfgwarn").hidden = false; return; }
   sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
   sb.auth.onAuthStateChange(function (event, session) {
+    if (event === "PASSWORD_RECOVERY") precisaSenha = true;
     // adia para fora do callback (recomendação do supabase-js)
-    setTimeout(function () { onSession(session); }, 0);
+    setTimeout(function () {
+      onSession(session);
+      // link vencido ou já usado: o Supabase volta com #error_code=otp_expired
+      if (!session && LINK_ERRO) {
+        showAuth(/expired/.test(LINK_ERRO[1]) ? "Este link expirou ou já foi usado. Peça um novo link a uma administradora." : "Não foi possível validar o link. Peça um novo link a uma administradora.");
+        limparEndereco(); LINK_ERRO = null;
+      }
+    }, 0);
   });
 })();

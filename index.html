@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap">
-<link rel="stylesheet" href="styles.css?v=22">
+<link rel="stylesheet" href="styles.css?v=23">
 </head>
 <body>
 
@@ -24,6 +24,15 @@
     <button class="btn" id="loginBtn" type="submit">Entrar</button>
     <p id="loginMsg" class="err" hidden></p>
     <p class="hint">Esqueceu a senha ou precisa de acesso? Fale com uma administradora do sistema.</p>
+  </form>
+  <form id="pwSetForm" novalidate hidden>
+    <img class="logo logo-lg" src="assets/logo-wap-waaw.webp?v=1" alt="WAP | WAAW by Alok" width="650" height="200">
+    <h1>Defina sua senha</h1>
+    <p class="sub" id="pwSetSub"></p>
+    <label for="pwNew">Nova senha (mín. 8 caracteres)<input id="pwNew" type="password" autocomplete="new-password" required></label>
+    <label for="pwNew2">Repita a senha<input id="pwNew2" type="password" autocomplete="new-password" required></label>
+    <button class="btn" id="pwSetBtn" type="submit">Salvar senha e entrar</button>
+    <p id="pwSetMsg" class="err" hidden></p>
   </form>
 </div>
 
@@ -123,12 +132,13 @@
       <form id="newUser" class="grid2" novalidate>
         <label for="nuName">Nome completo<input id="nuName" type="text" autocomplete="off" required></label>
         <label for="nuEmail">E-mail<input id="nuEmail" type="email" autocomplete="off" required></label>
-        <label for="nuPass">Senha provisória (mín. 8 caracteres)<input id="nuPass" type="password" autocomplete="new-password" required></label>
         <div class="row" style="align-self:end">
           <label class="check"><input id="nuAdmin" type="checkbox"> Administradora</label>
-          <button class="btn sm" id="nuBtn" type="submit">Criar</button>
+          <button class="btn sm" id="nuBtn" type="submit">Criar e preparar convite</button>
         </div>
       </form>
+      <p class="hint">A pessoa recebe um link para criar a própria senha. O e-mail sai do seu Outlook: o site só deixa a mensagem pronta.</p>
+      <div id="convite" class="convite" hidden></div>
     </div>
     <div class="card" id="lidCard">
       <h3>Lista de gestores</h3>
@@ -150,6 +160,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js?v=2"></script>
-<script src="app.js?v=27"></script>
+<script src="app.js?v=28"></script>
 </body>
 </html>
