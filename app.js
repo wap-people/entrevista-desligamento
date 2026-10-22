@@ -173,7 +173,7 @@
         if (rnd() < 0.6) x.mudaria = pickR(["Mais feedback da liderança", "Plano de carreira claro", "Melhorar a comunicação entre áreas"]);
         if (old) x.legado = { "Opinião sobre a infraestrutura da empresa": pickR(ESCALA), "Competência do líder para a função": pickR(["Altamente capacitado", "Capacitado", "Pouco capacitado"]), "Defina a WAP em uma palavra": pickR(["Aprendizado", "aprendizado", "Gratidão", "Oportunidade"]), "Conselho para quem vai ocupar a posição": "Conselho de exemplo " + i };
       }
-      if (rnd() < 0.5) x.obs = "Observação fictícia do entrevistador " + i;
+      if (rnd() < 0.6) x.obs = pickR(["Relatou que o gestor não dava feedback e se sentia desvalorizado pela liderança.", "Agradeceu a oportunidade; gostou muito da equipe e do ambiente de trabalho.", "Comentou que o salário estava abaixo do mercado e o vale alimentação é baixo.", "Saída por mudança de cidade para ficar perto da família.", "Reclamou da sobrecarga e da pressão no turno da noite; muito retrabalho por falta de processos.", "Sentiu falta de plano de carreira e de treinamentos; quer crescer profissionalmente.", "Desligamento por desempenho abaixo do esperado; recebeu feedbacks e advertências.", "Elogiou o time de People; disse que a comunicação entre áreas precisa melhorar."]) + " (exemplo " + i + ")";
       out.push(x);
     }
     return out;
@@ -741,13 +741,109 @@
     if (list.some(isVol)) wrap.appendChild(quotes("Fatores secundários da saída", null, resp.filter(isVol), "secundarios", function (x) { return ctx(x, why(x)); }));
     wrap.appendChild(quotes("O que mudaria na WAP", "“Se pudesse mudar uma coisa na WAP para melhorar a experiência dos colaboradores, o que mudaria?”", resp, "mudaria", function (x) { return ctx(x, why(x)); }));
     wrap.appendChild(quotes("Benefício a melhorar", null, resp, "beneficioMelhoria", function (x) { return ctx(x, why(x)); }));
-    wrap.appendChild(quotes("Observações do entrevistador", "Registro de quem conduziu a entrevista. Pode citar pessoas.", list, "obs", function (x) { return ctx(x, why(x)); }));
     return wrap;
   }
   function commentCount(list) {
     var n = 0, resp = list.filter(isResp);
     ["mudaria", "beneficioMelhoria", "secundarios"].forEach(function (k) { n += resp.filter(function (x) { return x[k]; }).length; });
-    return n + list.filter(function (x) { return x.obs; }).length;
+    return n;
+  }
+
+  /* ---------- Observações gerais do entrevistador: interpretação ----------
+     Leitura automática por palavras-chave, feita aqui no navegador (nenhum texto sai para serviços externos).
+     Cada observação recebe os temas que cita e um tom (positivo, negativo, misto ou neutro).
+     É um apoio à leitura: os números orientam onde olhar; o texto completo fica logo abaixo. */
+  var TEMAS = [
+    { id: "lider", nome: "Liderança e gestão", re: /\b(lider|gestor|gestora|gestao|gerente|coordenador|coordenadora|supervisor|supervisora|chefe|chefia|diretor)/ },
+    { id: "remun", nome: "Remuneração", re: /\b(salari|remunera|aumento|dissidio|reajuste|plr|bonus|defasad|ganhar mais|financeir)/ },
+    { id: "benef", nome: "Benefícios", re: /\b(benefici|vale[ -]?alimenta|vale[ -]?refei|vale[ -]?transporte|va\b|vr\b|plano de saude|plano odont|convenio|gympass|refeitorio|cesta|auxilio|almoco|comida)/ },
+    { id: "carreira", nome: "Carreira e desenvolvimento", re: /\b(carreira|crescimento|crescer|promoc|promovid|desenvolviment|treinament|capacita|aprendiz|aprendeu|aprender)/ },
+    { id: "clima", nome: "Clima e equipe", re: /\b(clima|equipe|colegas|ambiente|amizade|companheir|acolh|time\b(?! de people)|pares)/ },
+    { id: "reconh", nome: "Reconhecimento", re: /\b(reconhec|valoriz|desvaloriz)/ },
+    { id: "carga", nome: "Carga de trabalho e horários", re: /\b(sobrecarg|pressao|carga|horario|turno|hora extra|horas extras|escala|jornada|cansa|estress|esgot|acumul|demanda)/ },
+    { id: "proc", nome: "Processos e organização", re: /\b(processo|organiza|desorganiz|retrabalho|estrutura|planejament|prazo|sistema|ferramenta)/ },
+    { id: "comun", nome: "Comunicação e feedback", re: /\b(comunica|feedback|alinhament|alinhad|transparen|escuta|ouvid|sem retorno|demora nos retornos)/ },
+    { id: "pessoal", nome: "Motivos pessoais", re: /\b(pessoal|pessoais|familia|filho|filha|bebe|gravid|(?<!plano de )saude|mudanca de cidade|cidade natal|mudar de cidade|estud|faculdade|distancia|sonho)/ },
+    { id: "conduta", nome: "Desempenho e conduta", re: /\b(desempenho|performance|comportament|conduta|atraso|absente|advertenc|faltas|resistencia)/ }
+  ];
+  var TOM_POS = /\b(agradec|gratid|grato|grata|excelente|otim|gostou|gosta d|satisfeit|elogi|positiv|carinho|feliz|orgulh|recomend|respeit|apoio|suporte necessario|bem recebid|admira)/;
+  var TOM_NEG = /\b(insatisf|frustr|triste|tristeza|decepc|reclam|chatead|desmotiv|abandon|injust|ruim|pessim|desrespeit|descaso|dificuldade|problema|nao gost|falta de|mal trat|maltrat|desconfort|abalad|irritad|desanim|desvaloriz|inseguro|insegura|abaixo do mercado|baixo|baixa|insuficient|defasad|nao dava|nao tinha|nunca|sentiu falta|sentia falta|sobrecarg|retrabalho|desorganiz|cobranca excessiva)/;
+  function lerObs(x) {
+    var t = fold(x.obs);
+    var temas = TEMAS.filter(function (m) { return m.re.test(t); }).map(function (m) { return m.id; });
+    var p = TOM_POS.test(t), n = TOM_NEG.test(t);
+    return { temas: temas, tom: p && n ? "Misto" : n ? "Negativo" : p ? "Positivo" : "Neutro" };
+  }
+  var TOM_ORDEM = ["Negativo", "Misto", "Positivo", "Neutro"];
+  var obsTema = ""; // tema escolhido no filtro das observações
+  function temaNome(id) { return TEMAS.filter(function (m) { return m.id === id; })[0].nome; }
+
+  function observacoes(list) {
+    var wrap = el("div");
+    var obs = list.filter(function (x) { return x.obs && String(x.obs).trim().length > 3; }).map(function (x) { return { x: x, l: lerObs(x) }; });
+    if (!obs.length) { wrap.appendChild(el("p", { class: "hint", text: "Sem observações neste filtro." })); return wrap; }
+    var N = obs.length;
+    var conta = function (arr, id) { return arr.filter(function (o) { return o.l.temas.indexOf(id) >= 0; }).length; };
+    var rank = TEMAS.map(function (m) { return { id: m.id, nome: m.nome, n: conta(obs, m.id) }; }).filter(function (r) { return r.n; }).sort(function (a, b) { return b.n - a.n; });
+    var tons = {}; TOM_ORDEM.forEach(function (k) { tons[k] = obs.filter(function (o) { return o.l.tom === k; }).length; });
+
+    // Interpretação em texto, a partir dos números
+    var pts = [];
+    var semTema = obs.filter(function (o) { return !o.l.temas.length; }).length;
+    // "40% (28 de 70)": porcentagem primeiro, quantidade e base entre parênteses
+    var cit = function (n, base) { return pct(n, base) + "% (" + n + " de " + base + ")"; };
+    var top3 = rank.slice(0, 3);
+    if (top3.length) { var tp = ["Temas mais presentes: "]; top3.forEach(function (r, i) { tp.push([r.nome], " em " + cit(r.n, N) + (i === top3.length - 1 ? "." : i === top3.length - 2 ? "; e " : "; ")); }); pts.push(tp); }
+    pts.push(["Tom das observações: ", [pct(tons.Negativo, N) + "%"], " negativas, ", [pct(tons.Misto, N) + "%"], " mistas, ", [pct(tons.Positivo, N) + "%"], " positivas e " + pct(tons.Neutro, N) + "% neutras (base: " + N + ")."]);
+    // Tema que mais aparece junto de tom negativo (mín. 5 citações, para não exagerar casos isolados)
+    var neg = rank.filter(function (r) { return r.n >= 5; }).map(function (r) { var c = obs.filter(function (o) { return o.l.temas.indexOf(r.id) >= 0; }); return { nome: r.nome, n: c.length, ng: c.filter(function (o) { return o.l.tom === "Negativo" || o.l.tom === "Misto"; }).length }; })
+      .sort(function (a, b) { return b.ng / b.n - a.ng / a.n; })[0];
+    if (neg && neg.ng) pts.push(["Tema com mais carga negativa: ", [neg.nome], " — " + cit(neg.ng, neg.n) + " das observações que o citam têm tom negativo ou misto."]);
+    var vo = obs.filter(function (o) { return isVol(o.x); }), io = obs.filter(function (o) { return isInv(o.x); });
+    var topDe = function (arr) { return TEMAS.map(function (m) { return { nome: m.nome, n: conta(arr, m.id) }; }).sort(function (a, b) { return b.n - a.n; })[0]; };
+    if (vo.length >= 5 && io.length >= 5) { var tv = topDe(vo), ti = topDe(io); if (tv.n && ti.n) pts.push(["Nas voluntárias, o tema mais citado é ", [tv.nome], " — " + cit(tv.n, vo.length) + "; nas involuntárias, ", [ti.nome], " — " + cit(ti.n, io.length) + "."]); }
+    if (semTema) pts.push([np(semTema, N) + " não citam nenhum dos temas e ficam só na lista abaixo."]);
+    var lead = [[N + pl(N, " observação", " observações")], " registradas pelos entrevistadores neste filtro."];
+    wrap.appendChild(insight("--p1", "Interpretação automática", lead, pts));
+    wrap.appendChild(el("p", { class: "hint", style: "margin-top:8px", text: "Leitura por palavras-chave, feita no próprio site; serve para orientar a leitura, não para substituí-la. Uma observação pode citar vários temas." }));
+
+    // Temas (quantidade e %) e tom
+    var temasBox = chart("Temas citados", "Base: " + N + pl(N, " observação.", " observações.") + smallBase(N));
+    rank.forEach(function (r) { temasBox.appendChild(barRow(r.nome, r.n, N, null, "obs-tema")); });
+    var tomBox = chart("Tom das observações", "Base: " + N + pl(N, " observação.", " observações."));
+    var tomCor = { Negativo: "--s4", Misto: "--p3", Positivo: "--s1", Neutro: "--line-strong" };
+    TOM_ORDEM.forEach(function (k) { tomBox.appendChild(barRow(k, tons[k], N, tomCor[k], "obs-tom")); });
+    wrap.appendChild(el("div", { class: "duo" }, [temasBox, tomBox]));
+
+    // Voluntárias x involuntárias, tema a tema
+    if (vo.length && io.length) {
+      var cmp = chart("Temas por tipo de saída", "% das observações de cada grupo que citam o tema.");
+      cmp.appendChild(table(["Tema", "Voluntárias (" + vo.length + ")", "Involuntárias (" + io.length + ")"], rank.map(function (r) { return [r.nome, np(conta(vo, r.id), vo.length), np(conta(io, r.id), io.length)]; }), 1));
+      wrap.appendChild(cmp);
+    }
+
+    // Observações completas, filtráveis por tema
+    var lista = chart("Observações", "Escolha um tema para ler só as observações que o citam. Registro de quem conduziu a entrevista; pode citar pessoas.");
+    if (obsTema && !rank.some(function (r) { return r.id === obsTema; })) obsTema = "";
+    var chips = el("div", { class: "chips obs-chips" });
+    [{ id: "", nome: "Todas", n: N }].concat(rank).forEach(function (r) {
+      var b = el("button", { type: "button", class: "chipbtn" + (obsTema === r.id ? " on" : ""), text: r.nome + " · " + r.n });
+      b.addEventListener("click", function () { obsTema = r.id; expanded["q:obs"] = false; renderAll(); });
+      chips.appendChild(b);
+    });
+    lista.appendChild(chips);
+    var sel = obs.filter(function (o) { return !obsTema || o.l.temas.indexOf(obsTema) >= 0; }).sort(function (a, b) { return entryDate(a.x) < entryDate(b.x) ? 1 : -1; });
+    var lim = 5;
+    sel.slice(0, expanded["q:obs"] ? 9999 : lim).forEach(function (o) {
+      var tags = el("span", { class: "obs-tags" }, o.l.temas.map(function (id) { return el("span", { class: "obs-tag", text: temaNome(id) }); }).concat([el("span", { class: "obs-tag tom-" + fold(o.l.tom), text: "tom " + o.l.tom.toLowerCase() })]));
+      lista.appendChild(el("blockquote", { class: "quote" }, [el("p", { text: String(o.x.obs).trim() }), el("small", { text: ctx(o.x, why(o.x)) }), tags]));
+    });
+    moreToggle(lista, "q:obs", sel.length, lim);
+    wrap.appendChild(lista);
+
+    // Os demais comentários (dos colaboradores) continuam disponíveis, recolhidos
+    wrap.appendChild(collapsible("outros-com", "Outros comentários dos colaboradores", commentCount(list) + " comentários: o que mudaria, benefício a melhorar, fatores secundários e “Outro”", sayings(list)));
+    return wrap;
   }
 
   // Seção recolhível: abre ao clicar e continua aberta ao trocar filtros.
@@ -877,6 +973,21 @@
   // Medidor do eNPS (−100 a +100). Geometria num lugar só; o marcador gira em torno do centro do arco,
   // com o ângulo calculado do valor: −100 → −90°, 0 → 0°, +100 → +90°. O número fica dentro do arco.
   var GAUGE = { w: 264, h: 146, cx: 132, cy: 126, r: 88, label: 27, min: -100, max: 100 };
+  // Zonas de leitura do eNPS (definidas por People). O medidor usa as mesmas faixas e cores da legenda.
+  var NPS_ZONAS = [
+    { nome: "Zona Crítica", de: -100, ate: 0, cls: "z1", txt: "Alerta aceso. Alto índice de insatisfação; exige ações imediatas de melhoria no clima organizacional." },
+    { nome: "Zona de Aperfeiçoamento", de: 1, ate: 50, cls: "z2", txt: "Ponto de atenção. A empresa tem pontos positivos, mas há oportunidades claras de evolução." },
+    { nome: "Zona de Qualidade", de: 51, ate: 75, cls: "z3", txt: "Bom resultado. Os colaboradores estão engajados e a cultura interna está no caminho certo." },
+    { nome: "Zona de Excelência", de: 76, ate: 100, cls: "z4", txt: "Cenário ideal. Alto nível de lealdade e orgulho em pertencer; a empresa é uma marca empregadora forte." }
+  ];
+  function npsZona(v) { return v === null ? null : NPS_ZONAS.filter(function (z) { return v >= z.de && v <= z.ate; })[0]; }
+  // Legenda discreta das zonas, com a zona atual destacada
+  function zonasLegenda(v) {
+    var atual = npsZona(v);
+    return el("ul", { class: "zonas" }, NPS_ZONAS.map(function (z) {
+      return el("li", { class: z === atual ? "on" : "" }, [el("i", { class: z.cls }), el("span", null, [el("b", { text: z.nome.replace("Zona de ", "").replace("Zona ", "") }), document.createTextNode(" " + signed(z.de) + " a " + signed(z.ate) + ". " + z.txt)])]);
+    }));
+  }
   function gaugeAngle(v) { var c = Math.max(GAUGE.min, Math.min(GAUGE.max, v)); return ((c - GAUGE.min) / (GAUGE.max - GAUGE.min)) * 180 - 90; }
   function gaugePoint(v, r) { var a = gaugeAngle(v) * Math.PI / 180; return [GAUGE.cx + r * Math.sin(a), GAUGE.cy - r * Math.cos(a)]; }
   function gauge(v, n) {
@@ -885,8 +996,9 @@
       var p0 = gaugePoint(x0 + gap, G.r), p1 = gaugePoint(x1 - gap, G.r);
       return sv("path", { d: "M" + p0[0].toFixed(2) + " " + p0[1].toFixed(2) + " A" + G.r + " " + G.r + " 0 0 1 " + p1[0].toFixed(2) + " " + p1[1].toFixed(2), class: "gg " + cls });
     };
-    var kids = [arc(-100, 0, "gg-d"), arc(0, 50, "gg-n"), arc(50, 100, "gg-p")];
-    [-100, -50, 0, 50, 100].forEach(function (x) {
+    // Arcos nas fronteiras das zonas: −100 · 0 · 50 · 75 · +100
+    var kids = [arc(-100, 0, "z1"), arc(0, 50, "z2"), arc(50, 75, "z3"), arc(75, 100, "z4")];
+    [-100, 0, 50, 75, 100].forEach(function (x) {
       var p = gaugePoint(x, G.r + G.label), t = sv("text", { x: p[0].toFixed(1), y: (p[1] + (Math.abs(x) === 100 ? 14 : 4)).toFixed(1), class: "gg-t", "text-anchor": "middle" });
       t.textContent = x > 0 ? "+" + x : x < 0 ? "−" + Math.abs(x) : "0";
       kids.push(t);
@@ -902,7 +1014,7 @@
       kids.push(m);
     }
     var s = svg(G.w, G.h, kids); s.setAttribute("class", "gauge");
-    var val = el("div", { class: "gauge-v" }, [el("b", { text: v === null ? "–" : signed(v) }), el("span", { text: n ? n + pl(n, " nota", " notas") : "sem notas" })]);
+    var val = el("div", { class: "gauge-v" }, [el("b", { text: v === null ? "–" : signed(v) }), el("span", { class: "gauge-z" + (npsZona(v) ? " t-" + npsZona(v).cls : ""), text: npsZona(v) ? npsZona(v).nome : "" }), el("span", { text: n ? n + pl(n, " nota", " notas") : "sem notas" })]);
     return el("div", { class: "gauge-w", role: "img", "aria-label": v === null ? "eNPS sem notas" : "eNPS " + v + " numa escala de −100 a +100" }, [s, val]);
   }
   if (DEMO) window.__wapTest = { gauge: gauge, gaugeAngle: gaugeAngle, gaugePoint: gaugePoint, GAUGE: GAUGE, reset: function () { reset(); }, offerDraft: function () { return offerDraft(); }, state: function () { return S; } }; // só no modo demonstração, para validar medidor e rascunho
@@ -1003,7 +1115,8 @@
         st.npsN ? el("div", { class: "nps-side" }, [legendRow(npsParts, true),
           el("p", { class: "kpi-s" + (st.npsN < 20 ? " kpi-w" : ""), text: (st.npsN < 20 ? "Base pequena: " : "Base: ") + st.npsN + pl(st.npsN, " nota", " notas") + (st.npsN < 20 ? ". Leia com cautela." : ". eNPS = % promotores − % detratores.") })])
           : el("p", { class: "kpi-s", text: "Sem notas no filtro. A base 2024 não tinha esta pergunta; o eNPS vem das entrevistas do V2." })
-      ])
+      ]),
+      zonasLegenda(st.npsN ? st.nps : null)
     ]);
     var strip = el("div", { class: "kpis" + (t ? " kpis-4" : "") }, [
       kpi("", t ? T.titulo : "Saídas", String(st.n), saidasSub, null),
@@ -1046,8 +1159,6 @@
         bars("Benefício a melhorar", "Resposta aberta; grafias diferentes contam juntas.", resp, field("beneficioMelhoria"), { id: "bo", limit: 6, text: 1 })
       ]);
     }));
-    var nCom = commentCount(list), lastCom = list.filter(function (x) { return isResp(x) && x.mudaria; }).sort(function (a, b) { return entryDate(a) < entryDate(b) ? 1 : -1; })[0];
-    mods.push(mod("dizem", "O que estão dizendo", String(nCom), lastCom ? pl(nCom, "comentário", "comentários") + " · último: “" + String(lastCom.mudaria).slice(0, 60) + (String(lastCom.mudaria).length > 60 ? "…”" : "”") : "comentários com contexto", null, function () { return sayings(list); }));
     var tu = tally(list, field("unidade")), ta = tally(list, field("setor"));
     mods.push(mod("quem", "Quem saiu", tu.items[0] ? tu.items[0].label : "–", (tu.items[0] ? "unidade com mais saídas · " + np(tu.items[0].n, tu.tot) : "") + (ta.items[0] ? " · área: " + ta.items[0].label + " (" + ta.items[0].n + ")" : ""), null, function () {
       var q = el("div");
@@ -1080,6 +1191,11 @@
     }
     var old = list.filter(function (x) { return x.origem === "Base 2024"; });
     if (old.length) mods.push(mod("leg", "Perguntas da base 2024", String(old.length), pl(old.length, "entrevista", "entrevistas") + " do formulário antigo · infraestrutura, cultura, liderança e mais", null, function () { return legacyBlock(old); }));
+    // Último módulo: observações gerais do entrevistador, com interpretação
+    var obsL = list.filter(function (x) { return x.obs && String(x.obs).trim().length > 3; }), obsLidas = obsL.map(lerObs);
+    var obsTop = TEMAS.map(function (m) { return { nome: m.nome, n: obsLidas.filter(function (l) { return l.temas.indexOf(m.id) >= 0; }).length }; }).sort(function (a, b) { return b.n - a.n; });
+    mods.push(mod("obs", "Observações gerais do entrevistador", String(obsL.length), obsL.length ? pl(obsL.length, "observação", "observações") + " · mais citados: " + obsTop.slice(0, 2).filter(function (o) { return o.n; }).map(function (o) { return o.nome + " (" + pct(o.n, obsL.length) + "%)"; }).join(", ") : "sem observações neste filtro",
+      obsL.length ? minibar(TOM_ORDEM.map(function (k) { return { n: obsLidas.filter(function (l) { return l.tom === k; }).length, cls: "tom-" + fold(k), label: "Tom " + k.toLowerCase() }; }), "mb-obs") : null, function () { return observacoes(list); }));
 
     // Grade: o detalhe aberto entra logo depois da linha do cartão clicado (largura total)
     var grid = el("div", { class: "mods" });

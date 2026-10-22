@@ -343,7 +343,7 @@ footer { padding-block: 40px 56px; color: var(--muted); font-size: 13px; }
 .gauge-v { align-self: end; display: flex; flex-direction: column; align-items: center; padding-bottom: 2px; }
 .gauge-v b { font-size: 38px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .gauge-v span { font-size: 12px; color: var(--muted); margin-top: 2px; }
-.gg { fill: none; stroke-width: 14; } .gg-d { stroke: var(--s4); } .gg-n { stroke: var(--p3); } .gg-p { stroke: var(--s1); }
+.gg { fill: none; stroke-width: 14; }
 .gg-t { font-size: 11px; fill: var(--muted); font-family: var(--font); font-variant-numeric: tabular-nums; }
 .gg-m { transform-box: view-box; transition: transform .8s cubic-bezier(.2, .8, .2, 1); }
 .gg-dot { fill: var(--bg-alt); stroke: var(--fg); stroke-width: 3; }
@@ -365,3 +365,25 @@ footer { padding-block: 40px 56px; color: var(--muted); font-size: 13px; }
 .bar-info { display: flex; flex-direction: column; gap: 2px; }
 .draft-st { margin: 0; font-size: 13px; color: var(--muted); }
 .draft-st.bad { color: var(--err); font-weight: 600; }
+/* Zonas do eNPS: mesmas cores no arco, no nome da zona e na legenda */
+:root { --z1: var(--s4); --z2: var(--p3); --z3: var(--s2); --z4: var(--p4); }
+.gg.z1 { stroke: var(--z1); } .gg.z2 { stroke: var(--z2); } .gg.z3 { stroke: var(--z3); } .gg.z4 { stroke: var(--z4); }
+.t-z1 { color: var(--z1); } .t-z2 { color: var(--z2); } .t-z3 { color: var(--z3); } .t-z4 { color: var(--z4); }
+.gauge-z { font-size: 12px; font-weight: 700; margin-top: 4px; }
+/* Legenda discreta: pequena, em tom apagado; a zona atual fica em destaque */
+.zonas { list-style: none; margin: 0; padding: 12px 0 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 14px; font-size: 11px; line-height: 1.4; color: var(--muted); }
+.zonas li { display: grid; grid-template-columns: 4px 1fr; gap: 8px; opacity: .75; }
+.zonas li.on { opacity: 1; color: var(--fg); }
+.zonas i { border-radius: 2px; }
+.zonas i.z1 { background: var(--z1); } .zonas i.z2 { background: var(--z2); } .zonas i.z3 { background: var(--z3); } .zonas i.z4 { background: var(--z4); }
+.zonas b { font-weight: 700; color: var(--fg); }
+@media (max-width: 1480px) { .zonas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .zonas { grid-template-columns: 1fr; } }
+/* Observações do entrevistador: filtro por tema, etiquetas e cores do tom */
+.obs-chips { margin: 4px 0 16px; }
+.chipbtn { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--bg); color: var(--fg); cursor: pointer; }
+.chipbtn.on { background: var(--sel-bg); color: var(--sel-fg); border-color: var(--sel-line); font-weight: 600; }
+.obs-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.obs-tag { font-size: 11px; padding: 1px 8px; border-radius: 999px; background: var(--bg-alt); color: var(--muted); }
+.obs-tag.tom-negativo { color: var(--s4); } .obs-tag.tom-positivo { color: var(--s1); } .obs-tag.tom-misto { color: var(--p3); }
+.mb .tom-negativo { background: var(--s4); } .mb .tom-misto { background: var(--p3); } .mb .tom-positivo { background: var(--s1); } .mb .tom-neutro { background: var(--line-strong); }
