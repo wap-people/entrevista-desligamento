@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap">
-<link rel="stylesheet" href="styles.css?v=21">
+<link rel="stylesheet" href="styles.css?v=22">
 </head>
 <body>
 
@@ -104,21 +104,7 @@
       <label class="rsearch" for="rq"><span class="sr">Buscar pelo nome do entrevistado</span>
         <input id="rq" type="search" placeholder="Buscar pelo nome do entrevistado" autocomplete="off">
       </label>
-      <div class="filters">
-        <label for="rt">TIPO DE SAÍDA<select id="rt">
-          <option value="">Todas</option>
-          <option value="vol">Voluntárias</option>
-          <option value="inv">Involuntárias</option>
-          <option value="sem">Sem iniciativa registrada</option>
-        </select></label>
-        <label for="ru">UNIDADE<select id="ru"></select></label>
-        <label for="ro">ORIGEM<select id="ro">
-          <option value="">V2 e base 2024</option>
-          <option value="V2">Só V2</option>
-          <option value="Base 2024">Só base 2024</option>
-        </select></label>
-        <div id="rfms" class="row" style="align-items:flex-end;gap:12px 20px"></div>
-      </div>
+      <p class="hint">Para filtrar ou classificar, clique no título de uma coluna, como no Excel.</p>
     </div>
     <div class="pagehead">
       <p id="respinfo">Todas as entrevistas salvas.</p>
@@ -165,6 +151,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="config.js?v=2"></script>
-<script src="app.js?v=23"></script>
+<script src="app.js?v=24"></script>
 </body>
 </html>

@@ -1311,42 +1311,197 @@
     host.appendChild(grid);
   }
 
-  /* ---------- Respostas: busca por nome e filtros (independentes dos Indicadores) ---------- */
-  var ru = $("#ru");
-  ru.appendChild(el("option", { value: "", text: "Todas as unidades" }));
-  UNIDADES.concat(["Não informada"]).forEach(function (u) { ru.appendChild(el("option", { value: u, text: u })); });
-  var rMes = multiSelect($("#rfms"), "MÊS", function (x) { return entryDate(x).slice(0, 7); }, "meses",
-    { newest: 1, format: function (m) { return MESES[Number(m.slice(5, 7)) - 1] + "/" + m.slice(0, 4); } });
-  var rSetor = multiSelect($("#rfms"), "ÁREA", "setor", "áreas");
-  var rGestor = multiSelect($("#rfms"), "GESTOR", "gestor", "gestores");
-  var rEntrev = multiSelect($("#rfms"), "ENTREVISTADOR", "entrevistador", "entrevistadores");
-  var RFILTROS = [rMes, rSetor, rGestor, rEntrev];
+  /* ---------- Respostas: busca por nome e filtros por coluna, como no Excel (independentes dos Indicadores) ---------- */
+  function resultadoTxt(x) { return x.aceitou === "Sim" ? (typeof x.nps === "number" ? "Nota " + x.nps : "Respondeu") : "Recusou"; }
+  // v: valor da célula e do filtro; sv: valor para classificar; ord: textos de classificação
+  var AZ = ["Classificar de A a Z", "Classificar de Z a A"];
+  var RCOLS = [
+    { k: "data", t: "Data", v: function (x) { return entryDate(x).slice(0, 7); }, sv: entryDate,
+      fmt: function (m) { return MESES[Number(m.slice(5, 7)) - 1] + "/" + m.slice(0, 4); }, desc: 1,
+      ord: ["Da mais antiga para a mais nova", "Da mais nova para a mais antiga"] },
+    { k: "colaborador", t: "Colaborador", v: function (x) { return x.colaborador; } },
+    { k: "unidade", t: "Unidade", v: function (x) { return x.unidade; } },
+    { k: "setor", t: "Área", v: function (x) { return x.setor; } },
+    { k: "gestor", t: "Gestor", v: function (x) { return x.gestor; } },
+    { k: "entrevistador", t: "Entrevistador", v: function (x) { return x.entrevistador; } },
+    { k: "iniciativa", t: "Iniciativa", v: function (x) { return x.iniciativa; } },
+    { k: "resultado", t: "Resultado", v: resultadoTxt,
+      sv: function (x) { return x.aceitou === "Sim" ? (typeof x.nps === "number" ? x.nps : 11) : 12; },
+      ord: ["Da menor para a maior nota", "Da maior para a menor nota"] },
+    { k: "origem", t: "Origem", v: function (x) { return x.origem || "V2"; } }
+  ];
+  RCOLS.forEach(function (c) { c.sv = c.sv || function (x) { return fold(c.v(x)); }; c.ord = c.ord || AZ; });
+  var rf = {}, rsort = null; // rf[coluna] = { keys: {chave: 1}, labels: [...] }; rsort = { k, dir: 1 | -1 }
+  function cmpV(a, b) { return typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b), "pt-BR"); }
   var rqTimer = null;
   $("#rq").addEventListener("input", function () { clearTimeout(rqTimer); rqTimer = setTimeout(function () { openId = null; renderResp(); }, 120); });
-  ["#rt", "#ru", "#ro"].forEach(function (s) { $(s).addEventListener("change", function () { openId = null; renderResp(); }); });
-  function respAtivos() { return !!($("#rq").value.trim() || $("#rt").value || ru.value || $("#ro").value || RFILTROS.some(function (f) { return f.describe(); })); }
-  function respLimpar() { $("#rq").value = ""; $("#rt").value = ""; ru.value = ""; $("#ro").value = ""; RFILTROS.forEach(function (f) { f.clear(); }); openId = null; renderResp(); }
-  // Nome: todas as palavras digitadas precisam aparecer, sem diferença de maiúsculas ou acentos ("joao silva" acha "JOÃO DA SILVA")
-  function respFiltradas() {
-    var termos = fold($("#rq").value).split(" ").filter(Boolean), t = $("#rt").value, u = ru.value, o = $("#ro").value;
-    var tipo = { vol: isVol, inv: isInv, sem: function (x) { return !x.iniciativa; } }[t];
+  function respAtivos() { return !!($("#rq").value.trim() || Object.keys(rf).length); }
+  function respLimpar() { $("#rq").value = ""; rf = {}; openId = null; fecharFiltro(); renderResp(); }
+  // Nome: todas as palavras digitadas precisam aparecer, sem diferença de maiúsculas ou acentos ("joao silva" acha "JOÃO DA SILVA").
+  // exceto: ignora o filtro dessa coluna (as opções de uma coluna seguem as outras colunas, como no Excel).
+  function respFiltradas(exceto) {
+    var termos = fold($("#rq").value).split(" ").filter(Boolean);
+    var cols = RCOLS.filter(function (c) { return rf[c.k] && c.k !== exceto; });
     return entries.filter(function (x) {
       var n = fold(x.colaborador);
-      return termos.every(function (w) { return n.indexOf(w) >= 0; }) && (!tipo || tipo(x)) && (!u || (x.unidade || "") === u) && (!o || (x.origem || "V2") === o) && RFILTROS.every(function (f) { return f.test(x); });
+      return termos.every(function (w) { return n.indexOf(w) >= 0; }) && cols.every(function (c) { return !!rf[c.k].keys[fold(c.v(x))]; });
     });
+  }
+  // Lista na ordem da tela (e do Excel baixado). Vazias ficam sempre no fim.
+  function respLista() {
+    var l = respFiltradas();
+    if (!rsort) return l;
+    var c = RCOLS.filter(function (c) { return c.k === rsort.k; })[0];
+    return l.slice().sort(function (a, b) {
+      var va = c.v(a) ? c.sv(a) : null, vb = c.v(b) ? c.sv(b) : null;
+      if (va === null || vb === null) return va === vb ? 0 : va === null ? 1 : -1;
+      return cmpV(va, vb) * rsort.dir;
+    });
+  }
+
+  // Menu da coluna: classificar, limpar filtro, pesquisar, (Selecionar tudo), valores com quantidade, OK e Cancelar
+  var xf = el("div", { class: "xf", role: "dialog" }); xf.hidden = true; document.body.appendChild(xf);
+  var xfCol = null, xfBtn = null;
+  function fecharFiltro(foco) {
+    if (!xfCol) return;
+    xf.hidden = true; xf.textContent = ""; xfCol = null;
+    if (xfBtn) {
+      // a tabela pode ter sido redesenhada: devolve o foco ao botão novo da mesma coluna
+      var k = xfBtn.getAttribute("data-k"), b = document.querySelector('.xf-b[data-k="' + k + '"]') || xfBtn;
+      b.setAttribute("aria-expanded", "false"); if (foco) b.focus();
+    }
+  }
+  function abrirFiltro(c, btn) {
+    if (xfCol === c.k) { fecharFiltro(); return; }
+    fecharFiltro(); xfCol = c.k; xfBtn = btn; btn.setAttribute("aria-expanded", "true");
+    xf.setAttribute("aria-label", "Filtrar e classificar " + c.t);
+    var g = {};
+    respFiltradas(c.k).forEach(function (x) {
+      var v = c.v(x) || "", k = fold(v);
+      g[k] = g[k] || { key: k, n: 0, names: {}, sv: v ? c.sv(x) : null };
+      g[k].n++; g[k].names[v] = (g[k].names[v] || 0) + 1;
+    });
+    var opts = Object.keys(g).map(function (k) {
+      var nm = bestName(g[k].names);
+      return { key: k, n: g[k].n, sv: g[k].sv, label: !k ? "(Vazias)" : c.fmt ? c.fmt(nm) : nm };
+    }).sort(function (a, b) {
+      if (!a.key || !b.key) return !a.key ? 1 : -1;
+      return cmpV(a.sv, b.sv) * (c.desc ? -1 : 1);
+    });
+    var atual = rf[c.k], marc = {};
+    opts.forEach(function (o) { if (!atual || atual.keys[o.key]) marc[o.key] = 1; });
+
+    function ordBtn(i, dir) {
+      var on = !!(rsort && rsort.k === c.k && rsort.dir === dir);
+      var b = el("button", { type: "button", class: "xf-a" + (on ? " on" : ""), "aria-pressed": on ? "true" : "false" }, [el("span", { class: "xf-ic " + (dir > 0 ? "up" : "down"), "aria-hidden": "true" }), document.createTextNode(c.ord[i])]);
+      b.addEventListener("click", function () { rsort = on ? null : { k: c.k, dir: dir }; renderResp(); fecharFiltro(true); });
+      return b;
+    }
+    var limpa = el("button", { type: "button", class: "xf-a", text: "Limpar filtro de “" + c.t + "”" });
+    if (!atual) limpa.disabled = true;
+    limpa.addEventListener("click", function () { delete rf[c.k]; openId = null; renderResp(); fecharFiltro(true); });
+    var busca = el("input", { type: "search", placeholder: "Pesquisar", "aria-label": "Pesquisar valores de " + c.t, autocomplete: "off" });
+    var tudo = el("input", { type: "checkbox" });
+    var tudoTxt = document.createTextNode("(Selecionar tudo)");
+    var lista = el("div", { class: "xf-o" });
+    var ok = el("button", { type: "button", class: "btn sm", text: "OK" });
+    var cancela = el("button", { type: "button", class: "btn ghost sm", text: "Cancelar" });
+
+    function visiveis() { var q = fold(busca.value); return opts.filter(function (o) { return !q || fold(o.label).indexOf(q) >= 0; }); }
+    function estado() {
+      var vis = visiveis(), n = vis.filter(function (o) { return marc[o.key]; }).length;
+      tudo.checked = !!vis.length && n === vis.length; tudo.indeterminate = n > 0 && n < vis.length;
+      tudoTxt.nodeValue = busca.value.trim() ? "(Selecionar todos os resultados da pesquisa)" : "(Selecionar tudo)";
+      ok.disabled = !n;
+    }
+    function draw() {
+      lista.textContent = "";
+      var vis = visiveis();
+      vis.forEach(function (o) {
+        var cb = el("input", { type: "checkbox" }); cb.checked = !!marc[o.key];
+        cb.addEventListener("change", function () { if (cb.checked) marc[o.key] = 1; else delete marc[o.key]; estado(); });
+        lista.appendChild(el("label", { class: "check" }, [cb, el("span", { class: "xf-v", text: o.label }), el("span", { class: "ms-n", text: String(o.n) })]));
+      });
+      if (!vis.length) lista.appendChild(el("p", { class: "hint", text: "Nada encontrado." }));
+      estado();
+    }
+    tudo.addEventListener("change", function () {
+      var on = tudo.checked;
+      visiveis().forEach(function (o) { if (on) marc[o.key] = 1; else delete marc[o.key]; });
+      draw();
+    });
+    busca.addEventListener("input", draw);
+    function aplicar() {
+      // Com pesquisa, vale o que está marcado entre os resultados dela (como no Excel)
+      var esc = visiveis().filter(function (o) { return marc[o.key]; });
+      if (!esc.length) return;
+      if (!busca.value.trim() && esc.length === opts.length) delete rf[c.k];
+      else {
+        var keys = {}; esc.forEach(function (o) { keys[o.key] = 1; });
+        rf[c.k] = { keys: keys, labels: esc.map(function (o) { return o.label; }) };
+      }
+      openId = null; renderResp(); fecharFiltro(true);
+    }
+    ok.addEventListener("click", aplicar);
+    cancela.addEventListener("click", function () { fecharFiltro(true); });
+    busca.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); aplicar(); } });
+
+    xf.appendChild(el("div", { class: "xf-s" }, [ordBtn(0, 1), ordBtn(1, -1)]));
+    xf.appendChild(el("div", { class: "xf-s" }, [limpa]));
+    xf.appendChild(busca);
+    xf.appendChild(el("label", { class: "check xf-all" }, [tudo, tudoTxt]));
+    xf.appendChild(lista);
+    xf.appendChild(el("div", { class: "xf-f" }, [ok, cancela]));
+    draw();
+    xf.hidden = false;
+    posFiltro();
+    busca.focus();
+  }
+  function posFiltro() {
+    var r = xfBtn.getBoundingClientRect(), w = xf.offsetWidth, h = xf.offsetHeight, vw = document.documentElement.clientWidth;
+    var top = r.bottom + 6;
+    if (top + h > window.innerHeight - 8 && r.top - h - 6 > 8) top = r.top - h - 6;
+    xf.style.top = Math.max(8, top) + "px";
+    xf.style.left = Math.max(8, Math.min(r.left, vw - w - 8)) + "px";
+  }
+  document.addEventListener("click", function (e) { if (xfCol && !xf.contains(e.target) && !(xfBtn && xfBtn.contains(e.target))) fecharFiltro(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && xfCol) { e.preventDefault(); fecharFiltro(true); } });
+  window.addEventListener("resize", function () { fecharFiltro(); });
+  document.addEventListener("scroll", function (e) { if (xfCol && !xf.contains(e.target)) fecharFiltro(); }, true);
+  // Cabeçalho da coluna: nome + seta; funil quando filtrada; ↑/↓ quando classificada
+  function respHead(c) {
+    var filt = !!rf[c.k], ord = rsort && rsort.k === c.k ? rsort.dir : 0;
+    var desc = c.t + (filt ? ", filtrada" : "") + (ord ? (ord > 0 ? ", classificada em ordem crescente" : ", classificada em ordem decrescente") : "");
+    var b = el("button", { type: "button", class: "xf-b" + (filt ? " on" : ""), "data-k": c.k, "aria-haspopup": "dialog", "aria-expanded": xfCol === c.k ? "true" : "false", "aria-label": "Filtrar e classificar " + desc, title: "Filtrar e classificar" }, [
+      el("span", { text: c.t }),
+      ord ? el("span", { class: "xf-ic " + (ord > 0 ? "up" : "down"), "aria-hidden": "true" }) : null,
+      el("span", { class: "xf-ic " + (filt ? "funil" : "seta"), "aria-hidden": "true" })
+    ]);
+    b.addEventListener("click", function () { abrirFiltro(c, b); });
+    var th = el("th", null, [b]);
+    if (ord) th.setAttribute("aria-sort", ord > 0 ? "ascending" : "descending");
+    return th;
   }
 
   /* ---------- Respostas ---------- */
   function renderResp() {
     var host = $("#resp-body"); host.textContent = "";
     $("#cnt").textContent = String(entries.length);
-    var lista = respFiltradas(), ativos = respAtivos();
+    var lista = respLista(), ativos = respAtivos();
     $("#xls").hidden = !lista.length;
     $("#xls").textContent = ativos ? "Baixar Excel (" + lista.length + ")" : "Baixar Excel";
     var info = $("#respinfo"); info.textContent = "";
     if (!entries.length) info.textContent = "Todas as entrevistas salvas aparecem aqui.";
     else if (ativos) {
       info.appendChild(document.createTextNode("Mostrando " + lista.length + " de " + entries.length + pl(entries.length, " entrevista.", " entrevistas.") + " "));
+      // uma etiqueta por coluna filtrada, com × para tirar só aquele filtro
+      RCOLS.forEach(function (c) {
+        var f = rf[c.k]; if (!f) return;
+        var b = el("button", { class: "rchip", type: "button", "aria-label": "Tirar o filtro de " + c.t, title: f.labels.join(", ") }, [
+          el("span", { text: c.t + ": " + (f.labels.length === 1 ? f.labels[0] : f.labels.length + " valores") }), el("span", { class: "x", "aria-hidden": "true", text: "×" })]);
+        b.addEventListener("click", function () { delete rf[c.k]; openId = null; renderResp(); });
+        info.appendChild(b);
+      });
       var lim = el("button", { class: "lnk", type: "button", text: "Limpar filtros" }); lim.addEventListener("click", respLimpar); info.appendChild(lim);
     } else info.textContent = entries.length + pl(entries.length, " entrevista salva.", " entrevistas salvas.") + " Elas ficam guardadas até uma administradora excluir.";
     if (!entries.length) {
@@ -1387,8 +1542,9 @@
       var dt = el("td", { text: brDate(entryDate(x)) });
       if (x.origem === "Base 2024") dt.appendChild(el("span", { class: "tag", text: "2024" }));
       tb.appendChild(el("tr", null, [
-        dt, el("td", { text: x.colaborador || "" }), el("td", { text: x.unidade || "" }),
-        el("td", { text: x.iniciativa || "" }), el("td", { text: x.aceitou === "Sim" ? (typeof x.nps === "number" ? "Nota " + x.nps : "Respondeu") : "Recusou" }),
+        dt, el("td", { class: "nm", text: x.colaborador || "" }), el("td", { text: x.unidade || "" }), el("td", { text: x.setor || "" }),
+        el("td", { text: x.gestor || "" }), el("td", { text: x.entrevistador || "" }),
+        el("td", { text: x.iniciativa || "" }), el("td", { text: resultadoTxt(x) }), el("td", { text: x.origem || "V2" }),
         el("td", { class: "act" }, acts)
       ]));
       if (openId === x.id) {
@@ -1401,11 +1557,11 @@
           dl.appendChild(el("dt", { text: c[1] })); dl.appendChild(el("dd", { text: String(v) }));
         });
         if (x.criadoPor && memberNames[x.criadoPor]) { dl.appendChild(el("dt", { text: "Registrado por" })); dl.appendChild(el("dd", { text: memberNames[x.criadoPor] })); }
-        tb.appendChild(el("tr", { class: "det" }, [el("td", { colspan: "6" }, [dl])]));
+        tb.appendChild(el("tr", { class: "det" }, [el("td", { colspan: String(RCOLS.length + 1) }, [dl])]));
       }
     });
-    var head = ["Data", "Colaborador", "Unidade", "Iniciativa", "Resultado", ""].map(function (h) { return el("th", { text: h }); });
-    host.appendChild(el("div", { class: "tw" }, [el("table", null, [el("thead", null, [el("tr", null, head)]), tb])]));
+    var head = RCOLS.map(respHead).concat([el("th", null, [el("span", { class: "sr", text: "Ações" })])]);
+    host.appendChild(el("div", { class: "tw" }, [el("table", { class: "rtab" }, [el("thead", null, [el("tr", null, head)]), tb])]));
   }
 
   function renderAll() {
@@ -1416,7 +1572,7 @@
   }
 
   function loadEntries() {
-    return store.list().then(function (rows) { entries = rows; FILTROS.concat(RFILTROS).forEach(function (f) { f.refresh(rows); }); renderAll(); })
+    return store.list().then(function (rows) { entries = rows; FILTROS.forEach(function (f) { f.refresh(rows); }); renderAll(); })
       .catch(function (err) { warn("Não foi possível carregar as entrevistas. " + ((err && err.message) || "Recarregue a página.")); });
   }
   $("#reload").addEventListener("click", loadEntries);
@@ -1496,8 +1652,8 @@
     say("");
     if (!window.XLSX) { say("Não foi possível carregar o gerador de Excel. Verifique a conexão e recarregue a página."); return; }
     var wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, entrevistasSheet(respFiltradas()), "Entrevistas");
-    XLSX.utils.book_append_sheet(wb, indicadoresSheet(respFiltradas()), "Indicadores");
+    XLSX.utils.book_append_sheet(wb, entrevistasSheet(respLista()), "Entrevistas");
+    XLSX.utils.book_append_sheet(wb, indicadoresSheet(respLista()), "Indicadores");
     XLSX.writeFile(wb, "entrevistas-desligamento-v2-" + today() + ".xlsx");
   });
   // Indicadores: o recorte que está na tela
