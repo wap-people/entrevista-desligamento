@@ -387,3 +387,47 @@ footer { padding-block: 40px 56px; color: var(--muted); font-size: 13px; }
 .obs-tag { font-size: 11px; padding: 1px 8px; border-radius: 999px; background: var(--bg-alt); color: var(--muted); }
 .obs-tag.tom-negativo { color: var(--s4); } .obs-tag.tom-positivo { color: var(--s1); } .obs-tag.tom-misto { color: var(--p3); }
 .mb .tom-negativo { background: var(--s4); } .mb .tom-misto { background: var(--p3); } .mb .tom-positivo { background: var(--s1); } .mb .tom-neutro { background: var(--line-strong); }
+
+/* Topo dos indicadores: tipo de saída e "Baixar" na mesma linha; filtros embaixo */
+.ind-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.ind-top .fpanel { grid-column: 1 / -1; }
+.dl-menu { position: relative; justify-self: end; }
+.dl-menu > summary { list-style: none; cursor: pointer; display: inline-block; }
+.dl-menu > summary::-webkit-details-marker { display: none; }
+.dl-menu > summary::after { content: " ▾"; }
+.dl-p { position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; width: min(320px, calc(100vw - 32px)); background: var(--bg); border: 1px solid var(--line-strong); border-radius: 12px; padding: 6px; box-shadow: 0 8px 24px rgba(0, 0, 0, .18); display: flex; flex-direction: column; }
+.dl-p button { font: inherit; text-align: left; background: none; border: 0; color: var(--fg); padding: 10px 12px; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.dl-p button:hover, .dl-p button:focus-visible { background: var(--bg-alt); }
+.dl-p span { font-size: 13px; color: var(--muted); }
+.print-head { display: none; }
+
+/* ---------- PDF (impressão) ----------
+   Papel claro, só o conteúdo dos indicadores, módulos abertos em sequência, sem quebrar gráficos no meio. */
+@media print {
+  :root, :root:not([data-theme="light"]) {
+    --bg: #FFFFFF; --bg-alt: #F5F5F5; --fg: #1A1A1A; --muted: #4D4D4D; --line: #E6E6E6; --line-strong: #808080;
+    --accent: #1A1A1A; --on-accent: #FFFFFF; --sel-bg: #B2DFE3; --sel-fg: #1A1A1A; --sel-line: #0094A1; --bar: #0094A1; --err: #CB2A44;
+    --s1: #006770; --s2: #4DB4BD; --s3: #FDE6B6; --s4: #CB2A44; --t1: #FFFFFF; --t2: #1A1A1A; --t3: #1A1A1A; --t4: #FFFFFF; color-scheme: light;
+  }
+  @page { size: A4; margin: 12mm; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; transition: none !important; animation: none !important; }
+  body { padding: 0; background: #fff; font-size: 11pt; }
+  .wrap { max-width: none; padding: 0; }
+  .logo, :root:not([data-theme="light"]) .logo { filter: brightness(0) !important; opacity: .9; }
+  header.top .sub, .tabs, .who, #dbwarn, .ind-top, footer, .mods-h + .hint, .mod, .mod-ph .lnk, .chart .lnk, .obs-chips, #p-nova, #p-resp, #p-usr, .dl-menu { display: none !important; }
+  #p-ind { display: block !important; }
+  header.top { padding-block: 0 8px; }
+  h1 { font-size: 20pt; }
+  .print-head { display: block; font-size: 9pt; color: var(--muted); margin: 0 0 8px; }
+  .kpis, .kpis.kpis-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi-nps { grid-column: 1 / -1; }
+  .zonas { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .mods { display: block; }
+  .mod-p { border: 0; padding: 0; margin-top: 18px; break-inside: auto; }
+  .mod-ph { border-bottom: 2px solid var(--fg); padding-bottom: 4px; break-after: avoid; }
+  .chart, .kpi, .insight, .quote, .xp, .br, tr { break-inside: avoid; }
+  .fold { border: 0; } .fold > summary::after { display: none; } .fold-b { border: 0; padding: 0; }
+  .tw { overflow: visible; } table { min-width: 0; width: 100%; table-layout: fixed; font-size: 8.5pt; }
+  th, td { padding: 5px 6px; overflow-wrap: anywhere; } td.num, th.num { white-space: normal; } th { font-size: 7.5pt; letter-spacing: 0.04em; }
+}
+.aud-tabs { margin-top: 4px; }

@@ -127,8 +127,10 @@
     members: function () {
       return sb.from("members").select("*").order("full_name").then(function (r) { if (r.error) throw r.error; return r.data; });
     },
+    // Auditoria em duas listas separadas (200 mais recentes de cada): inclusões e exclusões
     audit: function () {
-      return sb.from("auditoria").select("*").order("em", { ascending: false }).limit(200).then(function (r) { if (r.error) throw r.error; return r.data; });
+      var q = function (acao) { return sb.from("auditoria").select("*").eq("acao", acao).order("em", { ascending: false }).limit(200).then(function (r) { if (r.error) throw r.error; return r.data; }); };
+      return Promise.all([q("criou"), q("excluiu")]).then(function (v) { return { criou: v[0], excluiu: v[1] }; });
     },
     // Rascunho da entrevista em andamento, no servidor (um por usuária)
     draftGet: function () {
@@ -186,16 +188,17 @@
       list: function () { return ok(rows.slice().sort(function (a, b) { return a.criadoEm < b.criadoEm ? 1 : -1; })); },
       insert: function (doc) {
         var d = Object.assign({ id: "demo-" + (++seq), criadoEm: new Date().toISOString() }, doc);
-        rows.push(d); log.unshift({ em: d.criadoEm, acao: "criou", entrevista_id: d.id, ator_nome: me.full_name });
+        rows.push(d); log.unshift({ em: d.criadoEm, acao: "criou", entrevista_id: d.id, entrevista_desc: [d.colaborador, brDate(d.data), d.unidade].join(" · "), ator_nome: me.full_name });
         return ok();
       },
       remove: function (id) {
+        var gone = rows.filter(function (x) { return x.id === id; })[0];
         rows = rows.filter(function (x) { return x.id !== id; });
-        log.unshift({ em: new Date().toISOString(), acao: "excluiu", entrevista_id: id, ator_nome: me.full_name });
+        log.unshift({ em: new Date().toISOString(), acao: "excluiu", entrevista_id: id, entrevista_desc: gone ? [gone.colaborador, brDate(gone.data), gone.unidade].join(" · ") : "", ator_nome: me.full_name });
         return ok();
       },
       members: function () { return ok(users); },
-      audit: function () { return ok(log); },
+      audit: function () { return ok({ criou: log.filter(function (a) { return a.acao === "criou"; }), excluiu: log.filter(function (a) { return a.acao === "excluiu"; }) }); },
       draftGet: function () { return ok(draft); },
       draftSave: function (dados) { draft = { dados: JSON.parse(JSON.stringify(dados)), atualizado_em: new Date().toISOString() }; return ok(); },
       draftDelete: function () { draft = null; return ok(); },
@@ -516,7 +519,8 @@
   var fGestor = multiSelect($("#fms"), "GESTOR", "gestor", "gestores");
   var fSetor = multiSelect($("#fms"), "ÁREA", "setor", "áreas");
   var fEntrev = multiSelect($("#fms"), "ENTREVISTADOR", "entrevistador", "entrevistadores");
-  var FILTROS = [fMes, fGestor, fSetor, fEntrev];
+  var fColab = multiSelect($("#fms"), "COLABORADOR", "colaborador", "colaboradores");
+  var FILTROS = [fMes, fGestor, fSetor, fEntrev, fColab];
 
   function pct(a, b) { return b ? Math.round((a / b) * 100) : null; }
   function fmt(v, suf) { return v === null || v === undefined ? "-" : v + (suf || ""); }
@@ -849,7 +853,7 @@
   // Seção recolhível: abre ao clicar e continua aberta ao trocar filtros.
   function collapsible(id, title, sub, content) {
     var d = el("details", { class: "fold" }, [el("summary", null, [el("span", { text: title }), sub ? el("small", { text: sub }) : null]), el("div", { class: "fold-b" }, [content])]);
-    if (expanded["sec:" + id]) d.open = true;
+    if (printMode || expanded["sec:" + id]) d.open = true;
     d.addEventListener("toggle", function () { expanded["sec:" + id] = d.open; });
     return d;
   }
@@ -950,6 +954,7 @@
   // Guarda o último valor de cada peça (pela chave) e aplica o novo no quadro seguinte, para a transição do CSS animar.
   var prevViz = {};
   function grow(node, key, prop, to, initial) {
+    if (printMode) { prevViz[key] = to; node.style[prop] = to; return; } // no PDF, sem animação
     var from = key in prevViz ? prevViz[key] : initial;
     prevViz[key] = to;
     if (from === undefined || from === to) { node.style[prop] = to; return; }
@@ -1068,7 +1073,8 @@
     ]);
     card.addEventListener("click", function () { openMod = openMod === id ? null : id; renderAll(); if (openMod) setTimeout(function () { var p = document.getElementById("mod-" + id); if (p) p.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, 30); });
     var wrap = el("div", { class: "mod" + (openMod === id ? " on" : "") }, [card]);
-    return { card: wrap, panel: openMod === id ? el("section", { class: "mod-p", id: "mod-" + id, "aria-label": title }, [el("div", { class: "mod-ph" }, [el("h3", { text: title }), el("button", { class: "lnk", type: "button", text: "Fechar" })]), build()]) : null };
+    // No PDF, todos os módulos saem abertos
+    return { card: wrap, panel: (printMode || openMod === id) ? el("section", { class: "mod-p", id: "mod-" + id, "aria-label": title }, [el("div", { class: "mod-ph" }, [el("h3", { text: title }), el("button", { class: "lnk", type: "button", text: "Fechar" })]), build()]) : null };
   }
 
   /* ---------- Indicadores: a história ---------- */
@@ -1284,10 +1290,10 @@
 
   /* ---------- Excel ---------- */
   function say(msg) { var m = $("#dlmsg"); m.textContent = msg; m.hidden = !msg; }
-  $("#xls").addEventListener("click", function () {
-    say("");
-    if (!window.XLSX) { say("Não foi possível carregar o gerador de Excel. Verifique a conexão e recarregue a página."); return; }
-    var asc = entries.slice().sort(function (a, b) { return entryDate(a) < entryDate(b) ? -1 : entryDate(a) > entryDate(b) ? 1 : (a.criadoEm < b.criadoEm ? -1 : 1); });
+  function sheet(aoa, cols) { var ws = XLSX.utils.aoa_to_sheet(aoa); if (cols) ws["!cols"] = cols.map(function (w) { return { wch: w }; }); return ws; }
+  // Uma linha por entrevista, em ordem cronológica, rótulos em português; "Classificação eNPS" no fim.
+  function entrevistasSheet(rows) {
+    var asc = rows.slice().sort(function (a, b) { return entryDate(a) < entryDate(b) ? -1 : entryDate(a) > entryDate(b) ? 1 : (a.criadoEm < b.criadoEm ? -1 : 1); });
     var aoa = [COLS.map(function (c) { return c[1]; }).concat(["Classificação eNPS"])];
     asc.forEach(function (x) {
       aoa.push(COLS.map(function (c) {
@@ -1297,34 +1303,97 @@
         if (c[0] === "criadoEm") return brDateTime(v);
         if (c[0] === "legado") return legadoTxt(v, " | ");
         return v;
-      }).concat([typeof x.nps === "number" ? (x.nps >= 9 ? "Promotor" : x.nps >= 7 ? "Neutro" : "Detrator") : ""]));
+      }).concat([typeof x.nps === "number" ? npsClass(x.nps) : ""]));
     });
-    var ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = COLS.map(function (c) { return { wch: Math.min(40, Math.max(12, c[1].length + 2)) }; }).concat([{ wch: 20 }]);
-    // Indicadores do conjunto completo: quantidade, base e % de cada um, para total, voluntárias e involuntárias.
+    return sheet(aoa, COLS.map(function (c) { return Math.min(40, Math.max(12, c[1].length + 2)); }).concat([20]));
+  }
+  // Indicadores: quantidade, base e % de cada um, para total, voluntárias e involuntárias.
+  function indicadoresSheet(rows) {
     var ind = [["Grupo", "Indicador", "Quantidade", "Base", "%"]];
     var put = function (g, label, n, base) { ind.push([g, label, n, base, pct(n, base) === null ? "" : pct(n, base)]); };
-    var tot = stats(entries);
+    var tot = stats(rows);
     put("Total", "Saídas voluntárias", tot.nVol, tot.n); put("Total", "Saídas involuntárias", tot.nInv, tot.n); put("Total", "Sem iniciativa registrada", tot.nSem, tot.n);
-    [["Total", entries], ["Voluntárias", entries.filter(isVol)], ["Involuntárias", entries.filter(isInv)]].forEach(function (gr) {
+    [["Total", rows], ["Voluntárias", rows.filter(isVol)], ["Involuntárias", rows.filter(isInv)]].forEach(function (gr) {
       var g = gr[0], l = gr[1], s = stats(l);
       put(g, "Saídas", s.n, tot.n);
       put(g, "Aceitaram a entrevista", s.nResp, s.n);
       put(g, "Promotores (9 e 10)", s.pro, s.npsN); put(g, "Neutros (7 e 8)", s.neu, s.npsN); put(g, "Detratores (0 a 6)", s.det, s.npsN);
       ind.push([g, "eNPS (pontos)", s.nps === null ? "" : s.nps, s.npsN, ""]);
+      ind.push([g, "Zona do eNPS", s.npsN ? npsZona(s.nps).nome : "", s.npsN, ""]);
       put(g, "Voltariam a trabalhar na WAP", s.voltaSim, s.voltaN);
       DIM.forEach(function (d) { var a = answered(s.resp, d[0]); ESCALA.forEach(function (k) { put(g, d[1] + ": " + k, a.filter(function (x) { return x[d[0]] === k; }).length, a.length); }); });
       var fb = answered(s.resp, "feedback"); FEEDBACK.forEach(function (k) { put(g, "Feedback 6 meses: " + k, fb.filter(function (x) { return x.feedback === k; }).length, fb.length); });
       if (g !== "Involuntárias") { var tf = tally(s.resp, field("principalFator")); tf.items.forEach(function (it) { put(g, "Principal fator: " + it.label, it.n, tf.tot); }); }
       if (g !== "Voluntárias") { var tm = tally(l, field("motivoInvoluntario")); tm.items.forEach(function (it) { put(g, "Motivo involuntário: " + it.label, it.n, tm.tot); }); }
+      ["beneficioMelhor", "beneficioMelhoria"].forEach(function (k) { var tb = tally(s.resp, field(k), null, 1); tb.items.forEach(function (it) { put(g, (k === "beneficioMelhor" ? "Benefício que mais atendia: " : "Benefício a melhorar: ") + it.label, it.n, tb.tot); }); });
     });
-    var wi = XLSX.utils.aoa_to_sheet(ind);
-    wi["!cols"] = [{ wch: 14 }, { wch: 56 }, { wch: 12 }, { wch: 10 }, { wch: 8 }];
+    return sheet(ind, [14, 60, 12, 10, 8]);
+  }
+  // Observações do entrevistador, com a interpretação (temas e tom) de cada uma.
+  function observacoesSheet(rows) {
+    var aoa = [["Data", "Unidade", "Área", "Gestor", "Tipo de saída", "Fator ou motivo", "Temas", "Tom", "Observação"]];
+    rows.filter(function (x) { return x.obs && String(x.obs).trim().length > 3; }).sort(function (a, b) { return entryDate(a) < entryDate(b) ? 1 : -1; }).forEach(function (x) {
+      var l = lerObs(x);
+      aoa.push([brDate(entryDate(x)), x.unidade || "", x.setor || "", x.gestor || "", isVol(x) ? "Voluntária" : isInv(x) ? "Involuntária" : "Sem iniciativa", x.principalFator || x.motivoInvoluntario || "", l.temas.map(temaNome).join("; "), l.tom, String(x.obs).trim()]);
+    });
+    return sheet(aoa, [11, 18, 18, 22, 14, 30, 40, 10, 100]);
+  }
+  function temasSheet(rows) {
+    var obs = rows.filter(function (x) { return x.obs && String(x.obs).trim().length > 3; }), lidas = obs.map(function (x) { return { x: x, l: lerObs(x) }; });
+    var vo = lidas.filter(function (o) { return isVol(o.x); }), io = lidas.filter(function (o) { return isInv(o.x); });
+    var c = function (arr, id) { return arr.filter(function (o) { return o.l.temas.indexOf(id) >= 0; }).length; };
+    var aoa = [["Tema", "Observações", "% do total", "Voluntárias", "% voluntárias", "Involuntárias", "% involuntárias"]];
+    TEMAS.forEach(function (m) { aoa.push([m.nome, c(lidas, m.id), pct(c(lidas, m.id), lidas.length), c(vo, m.id), pct(c(vo, m.id), vo.length), c(io, m.id), pct(c(io, m.id), io.length)]); });
+    aoa.push([]); aoa.push(["Tom", "Observações", "%"]);
+    TOM_ORDEM.forEach(function (k) { var n = lidas.filter(function (o) { return o.l.tom === k; }).length; aoa.push([k, n, pct(n, lidas.length)]); });
+    aoa.push([]); aoa.push(["Leitura automática por palavras-chave; uma observação pode citar vários temas."]);
+    return sheet(aoa, [32, 13, 11, 12, 13, 13, 15]);
+  }
+  // Filtros em uso, para o arquivo dizer de que recorte os números vêm.
+  function recorteTexto() {
+    var on = [{ "": "Todas", vol: "Voluntárias", inv: "Involuntárias", sem: "Sem iniciativa registrada" }[tipoAtual]];
+    if (fu.value) on.push(fu.value);
+    if ($("#fo").value) on.push($("#fo").value === "V2" ? "Só V2" : "Só base 2024");
+    FILTROS.forEach(function (f) { var d = f.describe(); if (d) on.push(d); });
+    return on.join(" · ");
+  }
+  function semXlsx() { if (window.XLSX) return false; alert("Não foi possível carregar o gerador de Excel. Verifique a conexão e recarregue a página."); return true; }
+  // Respostas: todas as entrevistas
+  $("#xls").addEventListener("click", function () {
+    say("");
+    if (!window.XLSX) { say("Não foi possível carregar o gerador de Excel. Verifique a conexão e recarregue a página."); return; }
     var wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Entrevistas");
-    XLSX.utils.book_append_sheet(wb, wi, "Indicadores");
+    XLSX.utils.book_append_sheet(wb, entrevistasSheet(entries), "Entrevistas");
+    XLSX.utils.book_append_sheet(wb, indicadoresSheet(entries), "Indicadores");
     XLSX.writeFile(wb, "entrevistas-desligamento-v2-" + today() + ".xlsx");
   });
+  // Indicadores: o recorte que está na tela
+  function xlsRecorte() {
+    if (semXlsx()) return;
+    var rows = filtered(), wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, sheet([["Indicadores · Entrevista de Desligamento V2"], ["Gerado em", brDateTime(new Date().toISOString())], ["Recorte", recorteTexto()], ["Entrevistas no recorte", rows.length]], [24, 90]), "Filtros");
+    XLSX.utils.book_append_sheet(wb, indicadoresSheet(rows), "Indicadores");
+    XLSX.utils.book_append_sheet(wb, temasSheet(rows), "Temas das observações");
+    XLSX.utils.book_append_sheet(wb, observacoesSheet(rows), "Observações");
+    XLSX.utils.book_append_sheet(wb, entrevistasSheet(rows), "Entrevistas");
+    XLSX.writeFile(wb, "indicadores-desligamento-" + today() + ".xlsx");
+  }
+  // PDF: abre a impressão com todos os módulos abertos e layout de papel; o navegador oferece "Salvar como PDF".
+  var printMode = false;
+  function pdfPagina() {
+    printMode = true;
+    $("#printHead").textContent = "Indicadores · Entrevista de Desligamento V2 · gerado em " + brDateTime(new Date().toISOString()) + " · Recorte: " + recorteTexto() + " · " + filtered().length + " entrevistas";
+    document.body.classList.add("printing");
+    renderAll();
+    setTimeout(function () { window.print(); }, 120);
+  }
+  window.addEventListener("afterprint", function () {
+    if (!printMode) return;
+    printMode = false; document.body.classList.remove("printing"); renderAll();
+  });
+  $("#dlPdf").addEventListener("click", function () { $("#dlmenu").open = false; pdfPagina(); });
+  $("#dlXls").addEventListener("click", function () { $("#dlmenu").open = false; xlsRecorte(); });
+  document.addEventListener("click", function (e) { var d = $("#dlmenu"); if (d.open && !d.contains(e.target)) d.open = false; });
 
   /* ---------- Usuários (só admins) ---------- */
   var pwFor = null;
@@ -1384,18 +1453,28 @@
     host.appendChild(el("div", { class: "tw" }, [el("table", null, [el("thead", null, [el("tr", null, head)]), tb])]));
   }
 
-  function renderAudit(list) {
+  // Auditoria em duas abas separadas: quem incluiu e quem excluiu entrevistas.
+  var audTab = "criou", audData = { criou: [], excluiu: [] };
+  function renderAudit(data) {
+    if (data) audData = data;
     var host = $("#aud-body"); host.textContent = "";
-    if (!list.length) { host.appendChild(el("p", { class: "hint", text: "Nenhum evento ainda." })); return; }
-    var byId = {};
-    entries.forEach(function (x) { byId[x.id] = x; });
+    var abas = [["criou", "Inclusões", "Quem registrou cada entrevista."], ["excluiu", "Exclusões", "Quem excluiu cada entrevista. Só administradoras podem excluir."]];
+    var tabs = el("div", { class: "seg aud-tabs", role: "tablist", "aria-label": "Auditoria" });
+    abas.forEach(function (a) {
+      var b = el("button", { type: "button", role: "tab", "aria-selected": String(audTab === a[0]), text: a[1] + " · " + audData[a[0]].length });
+      b.addEventListener("click", function () { audTab = a[0]; renderAudit(); });
+      tabs.appendChild(b);
+    });
+    host.appendChild(tabs);
+    var atual = abas.filter(function (a) { return a[0] === audTab; })[0], list = audData[audTab];
+    host.appendChild(el("p", { class: "hint", style: "margin-top:12px", text: atual[2] + " Mostra os 200 eventos mais recentes." }));
+    if (!list.length) { host.appendChild(el("p", { class: "hint", text: audTab === "criou" ? "Nenhuma inclusão registrada." : "Nenhuma exclusão registrada." })); return; }
     var tb = el("tbody");
     list.forEach(function (a) {
-      var e = byId[a.entrevista_id];
-      var alvo = e ? (e.colaborador + " · " + brDate(entryDate(e))) : "(entrevista excluída)";
-      tb.appendChild(el("tr", null, [el("td", { text: brDateTime(a.em) }), el("td", { text: a.acao }), el("td", { text: a.ator_nome || a.ator_email || "" }), el("td", { text: alvo })]));
+      var alvo = a.entrevista_desc || (audTab === "excluiu" ? "(identificação não guardada: exclusão anterior a 22/10/2026)" : "(entrevista excluída depois)");
+      tb.appendChild(el("tr", null, [el("td", { text: brDateTime(a.em) }), el("td", { text: a.ator_nome || a.ator_email || "" }), el("td", { text: alvo })]));
     });
-    var head = ["Quando", "Ação", "Quem", "Entrevista"].map(function (h) { return el("th", { text: h }); });
+    var head = ["Quando", audTab === "criou" ? "Registrou" : "Excluiu", "Entrevista (colaborador · data · unidade)"].map(function (h) { return el("th", { text: h }); });
     host.appendChild(el("div", { class: "tw" }, [el("table", null, [el("thead", null, [el("tr", null, head)]), tb])]));
   }
 

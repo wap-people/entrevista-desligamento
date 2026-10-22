@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap">
-<link rel="stylesheet" href="styles.css?v=12">
+<link rel="stylesheet" href="styles.css?v=17">
 </head>
 <body>
 
@@ -74,6 +74,13 @@
         <button type="button" role="radio" data-t="inv" aria-checked="false">Involuntárias</button>
         <button type="button" role="radio" data-t="sem" aria-checked="false">Sem iniciativa</button>
       </div>
+      <details class="dl-menu" id="dlmenu">
+        <summary class="btn ghost sm">Baixar</summary>
+        <div class="dl-p">
+          <button type="button" id="dlPdf"><b>PDF da página</b><span>Todos os módulos abertos. Escolha “Salvar como PDF” na janela que abrir.</span></button>
+          <button type="button" id="dlXls"><b>Excel</b><span>Indicadores, temas, observações e entrevistas do recorte atual.</span></button>
+        </div>
+      </details>
       <details class="fpanel" id="fpanel">
         <summary><span class="fp-t">Filtros</span><span id="fchips" class="fchips"></span></summary>
         <div class="filters">
@@ -88,6 +95,7 @@
         <div class="fp-foot"><button class="lnk" id="fclear" type="button">Limpar filtros</button></div>
       </details>
     </div>
+    <p id="printHead" class="print-head"></p>
     <div id="ind-main"></div>
   </section>
 
@@ -120,7 +128,6 @@
     <div id="usr-body"></div>
     <div class="chart">
       <h3>Auditoria</h3>
-      <p class="hint">Quem registrou e quem excluiu cada entrevista. Mostra os 200 eventos mais recentes.</p>
       <div id="aud-body"></div>
     </div>
   </section>
@@ -131,6 +138,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="config.js?v=2"></script>
-<script src="app.js?v=13"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>
