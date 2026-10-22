@@ -32,6 +32,7 @@ Formulário para o time de People conduzir e registrar entrevistas de desligamen
 
 - Push na `main` publica o site em alguns minutos.
 - Ao alterar `app.js`, `styles.css` ou `config.js`, aumente o `?v=` correspondente em `index.html` para o navegador não usar a versão antiga.
+- A biblioteca do Excel (SheetJS) não entra no `index.html`: o `app.js` só a baixa quando alguém vai exportar (`carregarXlsx`).
 - Mudança no banco: crie um novo arquivo numerado em `supabase/migrations/` e rode no SQL Editor.
 
 ## Testar localmente

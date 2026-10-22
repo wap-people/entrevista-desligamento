@@ -1676,19 +1676,46 @@
     FILTROS.forEach(function (f) { var d = f.describe(); if (d) on.push(d); });
     return on.join(" · ");
   }
-  function semXlsx() { if (window.XLSX) return false; alert("Não foi possível carregar o gerador de Excel. Verifique a conexão e recarregue a página."); return true; }
+  // Gerador de Excel (SheetJS, ~315 KB): só é baixado quando alguém vai exportar.
+  // Começa a baixar ao passar o mouse ou focar num botão de Excel, para o clique já encontrá-lo pronto.
+  var XLSX_URL = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js", xlsxP = null;
+  function carregarXlsx() {
+    if (window.XLSX) return Promise.resolve();
+    if (!xlsxP) xlsxP = new Promise(function (ok, falha) {
+      var s = el("script", { src: XLSX_URL });
+      s.onload = function () { if (window.XLSX) ok(); else { xlsxP = null; falha(); } };
+      s.onerror = function () { xlsxP = null; s.remove(); falha(); };
+      document.head.appendChild(s);
+    });
+    return xlsxP;
+  }
+  var SEM_XLSX = "Não foi possível carregar o gerador de Excel. Verifique a conexão e tente de novo.";
+  // Mostra "Preparando…" no botão enquanto baixa; ao terminar, gera o arquivo
+  function comXlsx(btn, gerar, erro) {
+    var txt = btn.textContent;
+    if (!window.XLSX) { btn.disabled = true; btn.textContent = "Preparando…"; }
+    carregarXlsx().then(gerar, function () { erro(SEM_XLSX); })
+      .catch(function (e) { erro("Não foi possível gerar o Excel. " + ((e && e.message) || "")); })
+      .then(function () { btn.disabled = false; btn.textContent = txt; });
+  }
+  ["#xls", "#dlmenu"].forEach(function (s) {
+    ["pointerenter", "focusin"].forEach(function (ev) { $(s).addEventListener(ev, function () { carregarXlsx().catch(function () {}); }); });
+  });
   // Respostas: todas as entrevistas
   $("#xls").addEventListener("click", function () {
     say("");
-    if (!window.XLSX) { say("Não foi possível carregar o gerador de Excel. Verifique a conexão e recarregue a página."); return; }
-    var wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, entrevistasSheet(respLista()), "Entrevistas");
-    XLSX.utils.book_append_sheet(wb, indicadoresSheet(respLista()), "Indicadores");
-    XLSX.writeFile(wb, "entrevistas-desligamento-v2-" + today() + ".xlsx");
+    comXlsx($("#xls"), function () {
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, entrevistasSheet(respLista()), "Entrevistas");
+      XLSX.utils.book_append_sheet(wb, indicadoresSheet(respLista()), "Indicadores");
+      XLSX.writeFile(wb, "entrevistas-desligamento-v2-" + today() + ".xlsx");
+    }, say);
   });
   // Indicadores: o recorte que está na tela
   function xlsRecorte() {
-    if (semXlsx()) return;
+    comXlsx($("#dlmenu summary"), gerarRecorte, function (m) { alert(m); });
+  }
+  function gerarRecorte() {
     var rows = filtered(), wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, sheet([["Indicadores · Entrevista de Desligamento V2"], ["Gerado em", brDateTime(new Date().toISOString())], ["Recorte", recorteTexto()], ["Entrevistas no recorte", rows.length]], [24, 90]), "Filtros");
     XLSX.utils.book_append_sheet(wb, indicadoresSheet(rows), "Indicadores");
