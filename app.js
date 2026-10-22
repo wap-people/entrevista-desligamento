@@ -230,9 +230,9 @@
       draftDelete: function () { draft = null; return ok(); },
       // convite e link de nova senha funcionam com um link de exemplo, que não dá acesso a nada
       admin: function (p) {
-        var link = location.origin + location.pathname + "?demo=1#link-de-exemplo-do-modo-demonstracao";
-        if (p.action === "invite") { users.push({ user_id: "demo-" + (++seq), email: p.email, full_name: p.full_name, is_admin: !!p.is_admin, active: true }); return ok({ ok: true, link: link }); }
-        if (p.action === "link") return ok({ ok: true, link: link });
+        var link = "exemplo-do-modo-demonstracao";
+        if (p.action === "invite") { users.push({ user_id: "demo-" + (++seq), email: p.email, full_name: p.full_name, is_admin: !!p.is_admin, active: true }); return ok({ ok: true, token: link }); }
+        if (p.action === "link") return ok({ ok: true, token: link });
         return Promise.reject({ message: "Indisponível no modo demonstração." });
       }
     };
@@ -1783,7 +1783,7 @@
         pw.addEventListener("click", function () {
           usrSay(""); pw.disabled = true; pw.textContent = "Gerando…";
           store.admin({ action: "link", user_id: m.user_id, redirect_to: location.origin + location.pathname })
-            .then(function (r) { mostrarConvite("senha", m.full_name || m.email, m.email, r.link); })
+            .then(function (r) { mostrarConvite("senha", m.full_name || m.email, m.email, r); })
             .catch(function (err) { usrSay((err && err.message) || "Não foi possível gerar o link.", true); })
             .then(function () { pw.disabled = false; pw.textContent = "Link de nova senha"; });
         });
@@ -1835,44 +1835,68 @@
     if (!name || !email) { usrSay("Informe nome e e-mail.", true); return; }
     var btn = $("#nuBtn"); btn.disabled = true; btn.textContent = "Criando…"; usrSay("");
     store.admin({ action: "invite", email: email, full_name: name, is_admin: $("#nuAdmin").checked, redirect_to: location.origin + location.pathname })
-      .then(function (r) { $("#newUser").reset(); mostrarConvite("convite", name, email, r.link); loadUsers(); })
+      .then(function (r) { $("#newUser").reset(); mostrarConvite("convite", name, email, r); loadUsers(); })
       .catch(function (err) { usrSay((err && err.message) || "Não foi possível criar o usuário.", true); })
       .then(function () { btn.disabled = false; btn.textContent = "Criar e preparar convite"; });
   });
 
   var SITE_URL = "https://wap-people.github.io/entrevista-desligamento/";
-  function textoConvite(tipo, nome, email, link) {
+  // Link curto para o próprio site (ver "Link curto do convite" no login)
+  function linkAcesso(tipo, r) { return SITE_URL + "?c=" + encodeURIComponent(r.token) + "&t=" + (tipo === "convite" ? "i" : "r"); }
+  // E-mail montado com o helper el (textos como texto, nunca HTML) e copiado formatado:
+  // no Outlook, o link vira o botão "Criar minha senha", clicável.
+  function emailConvite(tipo, nome, email, link) {
     var primeiro = String(nome || "").split(" ")[0];
     var assunto = tipo === "convite" ? "Seu acesso à Entrevista de Desligamento V2" : "Nova senha · Entrevista de Desligamento V2";
-    var corpo = (primeiro ? "Olá, " + primeiro + "!" : "Olá!") + "\n\n" +
-      (tipo === "convite"
-        ? "Você recebeu acesso ao sistema Entrevista de Desligamento V2, do time de People da WAP.\n\nPara entrar pela primeira vez, abra o link abaixo e crie a sua senha:\n"
-        : "Para criar uma nova senha no sistema Entrevista de Desligamento V2, abra o link abaixo:\n") +
-      link + "\n\n" +
-      "O link é pessoal, só funciona uma vez e vale por tempo limitado. Se ele expirar, me avise que eu envio outro.\n\n" +
-      "Depois disso, o acesso é sempre por " + SITE_URL + "\nSeu login é este e-mail: " + email + "\n\n" +
-      (me && me.full_name ? me.full_name : "");
-    return { assunto: assunto, corpo: corpo };
+    var p = function (t, kids) { return el("p", { style: "margin:0 0 14px" }, kids || [document.createTextNode(t)]); };
+    var botao = el("a", { href: link, style: "display:inline-block;background:#0094A1;color:#FFFFFF;text-decoration:none;font-weight:600;padding:10px 22px;border-radius:999px" , text: tipo === "convite" ? "Criar minha senha" : "Criar nova senha" });
+    var site = el("a", { href: SITE_URL, text: "wap-people.github.io/entrevista-desligamento" });
+    var corpo = el("div", { style: "font-family:Segoe UI,Arial,sans-serif;font-size:15px;line-height:1.5;color:#1A1A1A" }, [
+      p(primeiro ? "Olá, " + primeiro + "!" : "Olá!"),
+      p(tipo === "convite"
+        ? "Você recebeu acesso ao sistema Entrevista de Desligamento V2, do time de People da WAP. Para entrar pela primeira vez, clique no botão abaixo e crie a sua senha:"
+        : "Para criar uma nova senha no sistema Entrevista de Desligamento V2, clique no botão abaixo:"),
+      p("", [botao]),
+      p("O link é pessoal e só funciona uma vez. Se ele expirar, me avise que eu envio outro."),
+      p("", [document.createTextNode("Depois disso, o acesso é sempre por "), site, document.createTextNode(", com o login " + email + ".")]),
+      p(me && me.full_name ? me.full_name : "")
+    ]);
+    var texto = (primeiro ? "Olá, " + primeiro + "!" : "Olá!") + "\n\n" +
+      (tipo === "convite" ? "Você recebeu acesso ao sistema Entrevista de Desligamento V2, do time de People da WAP. Para entrar pela primeira vez, abra o link abaixo e crie a sua senha:\n" : "Para criar uma nova senha no sistema Entrevista de Desligamento V2, abra o link abaixo:\n") +
+      link + "\n\nO link é pessoal e só funciona uma vez. Se ele expirar, me avise que eu envio outro.\n\n" +
+      "Depois disso, o acesso é sempre por " + SITE_URL + ", com o login " + email + ".\n\n" + (me && me.full_name ? me.full_name : "");
+    return { assunto: assunto, corpo: corpo, texto: texto };
   }
-  // Painel com a mensagem pronta: abrir no Outlook (aplicativo ou web) ou copiar
-  function mostrarConvite(tipo, nome, email, link) {
-    var box = $("#convite"), t = textoConvite(tipo, nome, email, link);
+  // Copia formatado (HTML + texto puro). Se o navegador não deixar, seleciona a prévia e usa o copiar do sistema.
+  function copiarFormatado(node, texto) {
+    if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+      return navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([node.outerHTML], { type: "text/html" }), "text/plain": new Blob([texto], { type: "text/plain" }) })]);
+    }
+    var sel = window.getSelection(), rg = document.createRange(); rg.selectNodeContents(node); sel.removeAllRanges(); sel.addRange(rg);
+    var ok = document.execCommand("copy"); sel.removeAllRanges();
+    return ok ? Promise.resolve() : Promise.reject();
+  }
+  // Painel em dois passos: 1) copiar o e-mail formatado; 2) abrir um e-mail novo no Outlook e colar (Ctrl+V)
+  function mostrarConvite(tipo, nome, email, r) {
+    var box = $("#convite"), link = linkAcesso(tipo, r), t = emailConvite(tipo, nome, email, link);
     box.textContent = "";
-    var q = "?to=" + encodeURIComponent(email) + "&subject=" + encodeURIComponent(t.assunto) + "&body=" + encodeURIComponent(t.corpo);
-    var app = el("a", { class: "btn sm", href: "mailto:" + encodeURIComponent(email) + "?subject=" + encodeURIComponent(t.assunto) + "&body=" + encodeURIComponent(t.corpo), text: "Abrir no Outlook" });
-    var web = el("a", { class: "btn sm ghost", href: "https://outlook.office.com/mail/deeplink/compose" + q, target: "_blank", rel: "noopener", text: "Abrir no Outlook na web" });
-    var cp = el("button", { class: "lnk", type: "button", text: "Copiar mensagem" });
+    var q = "?to=" + encodeURIComponent(email) + "&subject=" + encodeURIComponent(t.assunto);
+    var cp = el("button", { class: "btn sm", type: "button", text: "1. Copiar e-mail" });
+    var app = el("a", { class: "btn sm ghost", href: "mailto:" + encodeURIComponent(email) + "?subject=" + encodeURIComponent(t.assunto), text: "2. Abrir no Outlook" });
+    var web = el("a", { class: "lnk", href: "https://outlook.office.com/mail/deeplink/compose" + q, target: "_blank", rel: "noopener", text: "ou no Outlook na web" });
+    var aviso = el("p", { class: "hint", text: "" });
     cp.addEventListener("click", function () {
-      var txt = "Assunto: " + t.assunto + "\n\n" + t.corpo;
-      (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { cp.textContent = "Mensagem copiada"; }, function () { pre.focus(); cp.textContent = "Selecione o texto abaixo e copie"; });
+      copiarFormatado(t.corpo, t.texto).then(function () {
+        cp.textContent = "E-mail copiado ✓"; aviso.textContent = "Agora abra o Outlook: o destinatário e o assunto já vêm preenchidos. Clique no corpo do e-mail, cole com Ctrl+V e envie.";
+      }, function () { aviso.textContent = "Não foi possível copiar sozinho. Selecione a prévia abaixo, copie com Ctrl+C e cole no e-mail."; });
     });
     var fechar = el("button", { class: "lnk", type: "button", text: "Fechar" });
     fechar.addEventListener("click", function () { box.hidden = true; box.textContent = ""; });
-    var pre = el("textarea", { class: "convite-txt", readonly: "", rows: "12", "aria-label": "Mensagem pronta" }); pre.value = "Assunto: " + t.assunto + "\n\n" + t.corpo;
     box.appendChild(el("p", { class: "convite-h", text: (tipo === "convite" ? "Usuário criado. " : "Link gerado. ") + "Falta enviar o e-mail para " + email + "." }));
-    box.appendChild(el("p", { class: "hint", text: "Confira a mensagem e clique em Enviar no Outlook. O link é pessoal: não compartilhe em grupos." }));
-    box.appendChild(el("div", { class: "row" }, [app, web, cp, fechar]));
-    box.appendChild(pre);
+    box.appendChild(el("p", { class: "hint", text: "Assunto: " + t.assunto + ". O link é pessoal: não compartilhe em grupos." }));
+    box.appendChild(el("div", { class: "row" }, [cp, app, web, fechar]));
+    box.appendChild(aviso);
+    box.appendChild(el("div", { class: "convite-prev", "aria-label": "Prévia do e-mail" }, [t.corpo]));
     box.hidden = false;
     box.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
@@ -1950,15 +1974,38 @@
 
   /* ---------- Login e início ---------- */
   function showAuth(msg) {
-    $("#app").hidden = true; $("#auth").hidden = false; $("#loginForm").hidden = false; $("#pwSetForm").hidden = true;
+    $("#app").hidden = true; $("#auth").hidden = false; $("#loginForm").hidden = false; $("#pwSetForm").hidden = true; $("#linkForm").hidden = true;
     var m = $("#loginMsg"); m.textContent = msg || ""; m.hidden = !msg;
   }
+
+  // Link curto do convite ou da nova senha: ?c=<código>&t=i (convite) ou t=r (nova senha).
+  // O código só é validado quando a pessoa clica em "Continuar": o antivírus do e-mail, que abre
+  // os links antes, só carrega a página e não gasta o código.
+  var Q = new URLSearchParams(location.search), CODIGO = Q.get("c"), CODIGO_TIPO = Q.get("t") === "i" ? "invite" : "recovery";
+  var aguardandoLink = !!CODIGO && !DEMO;
+  function showLinkForm() {
+    $("#app").hidden = true; $("#auth").hidden = false; $("#loginForm").hidden = true; $("#pwSetForm").hidden = true; $("#linkForm").hidden = false;
+    $("#linkTitle").textContent = CODIGO_TIPO === "invite" ? "Criar sua senha" : "Criar uma nova senha";
+  }
+  $("#linkForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var btn = $("#linkBtn"), msg = $("#linkMsg"); btn.disabled = true; btn.textContent = "Validando"; msg.hidden = true;
+    sb.auth.verifyOtp({ token_hash: CODIGO, type: CODIGO_TIPO }).then(function (r) {
+      btn.disabled = false; btn.textContent = "Continuar";
+      if (r.error || !r.data || !r.data.session) {
+        msg.textContent = /expired|invalid/i.test((r.error && r.error.message) || "") ? "Este link expirou ou já foi usado. Peça um novo link a uma administradora." : "Não foi possível validar o link. " + ((r.error && r.error.message) || "Peça um novo link a uma administradora.");
+        msg.hidden = false; return;
+      }
+      aguardandoLink = false; precisaSenha = true; limparEndereco();
+      onSession(r.data.session);
+    });
+  });
 
   // Quem chega por um link de convite ou de nova senha: o Supabase devolve a sessão no endereço
   // (#...type=invite ou type=recovery). Antes de entrar, a pessoa cria a senha.
   var LINK = /[#&]type=(invite|recovery)\b/.exec(location.hash), LINK_ERRO = /[#&]error_code=([^&]+)/.exec(location.hash);
   var precisaSenha = !!LINK;
-  function limparEndereco() { if (location.hash) history.replaceState(null, "", location.pathname + location.search); }
+  function limparEndereco() { if (location.hash || CODIGO) history.replaceState(null, "", location.pathname); }
   function showPwSet(member) {
     $("#app").hidden = true; $("#auth").hidden = false; $("#loginForm").hidden = true; $("#pwSetForm").hidden = false;
     $("#pwSetSub").textContent = (LINK && LINK[1] === "invite" ? "Boas-vindas, " : "Olá, ") + (member.full_name || member.email) + ". Crie a senha que você vai usar para entrar com o e-mail " + member.email + ".";
@@ -2027,6 +2074,7 @@
     if (event === "PASSWORD_RECOVERY") precisaSenha = true;
     // adia para fora do callback (recomendação do supabase-js)
     setTimeout(function () {
+      if (aguardandoLink) { showLinkForm(); return; } // espera o clique em "Continuar"
       onSession(session);
       // link vencido ou já usado: o Supabase volta com #error_code=otp_expired
       if (!session && LINK_ERRO) {

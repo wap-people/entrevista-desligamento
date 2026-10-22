@@ -496,4 +496,6 @@ footer { padding-block: 40px 56px; color: var(--muted); font-size: 13px; }
 .convite .hint { margin: 0; }
 .convite .row { flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .convite a.btn { text-decoration: none; display: inline-block; }
-.convite-txt { width: 100%; max-width: none; font: inherit; font-size: 14px; line-height: 1.5; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; resize: vertical; }
+.convite-prev { background: #FFFFFF; color: #1A1A1A; border: 1px solid var(--line); border-radius: 8px; padding: 16px; max-height: 360px; overflow: auto; }
+.convite-prev a { color: inherit; }
+.convite-prev a[style] { color: #FFFFFF; }

@@ -7,6 +7,9 @@
 //   { action: "create", email, password, full_name, is_admin }      (antigo: com senha provisória)
 //   { action: "update", user_id, full_name?, is_admin?, active?, password? }
 // Os links NÃO são enviados por e-mail pelo Supabase: a administradora os envia pelo próprio Outlook.
+// Devolve "token" (hash do código de uso único): o site monta um link curto para ele mesmo
+// (?c=<token>&t=i|r) e só valida o código quando a pessoa clica em "Continuar". Assim o link não
+// depende do Site URL do Supabase e não é gasto pelo antivírus do e-mail, que abre os links antes.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -78,7 +81,7 @@ Deno.serve(async (req) => {
       user_id: gen.user.id, email, full_name: fullName, is_admin: isAdmin, active: true, created_by: callerId,
     });
     if (mErr) return json({ error: "Convite criado, mas falhou ao registrar o acesso: " + mErr.message }, 500);
-    return json({ ok: true, user_id: gen.user.id, link: gen.properties.action_link });
+    return json({ ok: true, user_id: gen.user.id, token: gen.properties.hashed_token, link: gen.properties.action_link });
   }
 
   if (body.action === "link") {
@@ -92,7 +95,7 @@ Deno.serve(async (req) => {
       type: "recovery", email: u.user.email, options: { redirectTo: destino(body.redirect_to) },
     });
     if (error || !gen?.properties?.action_link) return json({ error: "Não foi possível gerar o link: " + (error?.message || "erro") }, 400);
-    return json({ ok: true, link: gen.properties.action_link });
+    return json({ ok: true, token: gen.properties.hashed_token, link: gen.properties.action_link });
   }
 
   if (body.action === "create") {

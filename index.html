@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap">
-<link rel="stylesheet" href="styles.css?v=23">
+<link rel="stylesheet" href="styles.css?v=24">
 </head>
 <body>
 
@@ -24,6 +24,13 @@
     <button class="btn" id="loginBtn" type="submit">Entrar</button>
     <p id="loginMsg" class="err" hidden></p>
     <p class="hint">Esqueceu a senha ou precisa de acesso? Fale com uma administradora do sistema.</p>
+  </form>
+  <form id="linkForm" novalidate hidden>
+    <img class="logo logo-lg" src="assets/logo-wap-waaw.webp?v=1" alt="WAP | WAAW by Alok" width="650" height="200">
+    <h1 id="linkTitle">Criar sua senha</h1>
+    <p class="sub">Entrevista de Desligamento V2 · time de People da WAP. Clique em Continuar para validar o seu link e criar a senha.</p>
+    <button class="btn" id="linkBtn" type="submit">Continuar</button>
+    <p id="linkMsg" class="err" hidden></p>
   </form>
   <form id="pwSetForm" novalidate hidden>
     <img class="logo logo-lg" src="assets/logo-wap-waaw.webp?v=1" alt="WAP | WAAW by Alok" width="650" height="200">
@@ -160,6 +167,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js?v=2"></script>
-<script src="app.js?v=28"></script>
+<script src="app.js?v=29"></script>
 </body>
 </html>
