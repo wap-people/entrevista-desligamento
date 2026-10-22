@@ -56,7 +56,7 @@ body {
 /* O formulário mantém largura de leitura confortável */
 #p-nova form, #p-nova .done { max-width: 920px; }
 header.top { padding-block: 32px 8px; display: flex; flex-direction: column; gap: 20px; }
-.toprow { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.toprow { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
 .who { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 14px; flex-wrap: wrap; }
 .brand { display: flex; align-items: flex-end; gap: 6px; height: 40px; }
 .brand i { display: block; width: 10px; border-radius: 5px; }
@@ -324,3 +324,8 @@ footer { padding-block: 40px 56px; color: var(--muted); font-size: 13px; }
 .dn { transition: stroke-dasharray .7s ease, stroke-dashoffset .7s ease; }
 .gg-h { transition: transform .9s cubic-bezier(.3, 1.25, .5, 1); }
 @media (prefers-reduced-motion: reduce) { .mb i, .br .fl, .xp-bar .seg, .dn, .gg-h { transition: none; } }
+/* Logo WAP | WAAW by Alok: o arquivo é branco (para fundo escuro); no tema claro fica preto por filtro */
+.logo { display: block; height: 60px; width: auto; margin-left: -8px; }
+.logo-lg { height: 76px; }
+:root:not([data-theme="dark"]) .logo { filter: brightness(0); opacity: .9; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .logo { filter: none; opacity: 1; } }
