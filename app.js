@@ -1311,18 +1311,54 @@
     host.appendChild(grid);
   }
 
+  /* ---------- Respostas: busca por nome e filtros (independentes dos Indicadores) ---------- */
+  var ru = $("#ru");
+  ru.appendChild(el("option", { value: "", text: "Todas as unidades" }));
+  UNIDADES.concat(["Não informada"]).forEach(function (u) { ru.appendChild(el("option", { value: u, text: u })); });
+  var rMes = multiSelect($("#rfms"), "MÊS", function (x) { return entryDate(x).slice(0, 7); }, "meses",
+    { newest: 1, format: function (m) { return MESES[Number(m.slice(5, 7)) - 1] + "/" + m.slice(0, 4); } });
+  var rSetor = multiSelect($("#rfms"), "ÁREA", "setor", "áreas");
+  var rGestor = multiSelect($("#rfms"), "GESTOR", "gestor", "gestores");
+  var rEntrev = multiSelect($("#rfms"), "ENTREVISTADOR", "entrevistador", "entrevistadores");
+  var RFILTROS = [rMes, rSetor, rGestor, rEntrev];
+  var rqTimer = null;
+  $("#rq").addEventListener("input", function () { clearTimeout(rqTimer); rqTimer = setTimeout(function () { openId = null; renderResp(); }, 120); });
+  ["#rt", "#ru", "#ro"].forEach(function (s) { $(s).addEventListener("change", function () { openId = null; renderResp(); }); });
+  function respAtivos() { return !!($("#rq").value.trim() || $("#rt").value || ru.value || $("#ro").value || RFILTROS.some(function (f) { return f.describe(); })); }
+  function respLimpar() { $("#rq").value = ""; $("#rt").value = ""; ru.value = ""; $("#ro").value = ""; RFILTROS.forEach(function (f) { f.clear(); }); openId = null; renderResp(); }
+  // Nome: todas as palavras digitadas precisam aparecer, sem diferença de maiúsculas ou acentos ("joao silva" acha "JOÃO DA SILVA")
+  function respFiltradas() {
+    var termos = fold($("#rq").value).split(" ").filter(Boolean), t = $("#rt").value, u = ru.value, o = $("#ro").value;
+    var tipo = { vol: isVol, inv: isInv, sem: function (x) { return !x.iniciativa; } }[t];
+    return entries.filter(function (x) {
+      var n = fold(x.colaborador);
+      return termos.every(function (w) { return n.indexOf(w) >= 0; }) && (!tipo || tipo(x)) && (!u || (x.unidade || "") === u) && (!o || (x.origem || "V2") === o) && RFILTROS.every(function (f) { return f.test(x); });
+    });
+  }
+
   /* ---------- Respostas ---------- */
   function renderResp() {
     var host = $("#resp-body"); host.textContent = "";
     $("#cnt").textContent = String(entries.length);
-    $("#xls").hidden = !entries.length;
-    $("#respinfo").textContent = entries.length ? entries.length + (entries.length === 1 ? " entrevista salva." : " entrevistas salvas.") + " Elas ficam guardadas até uma administradora excluir." : "Todas as entrevistas salvas aparecem aqui.";
+    var lista = respFiltradas(), ativos = respAtivos();
+    $("#xls").hidden = !lista.length;
+    $("#xls").textContent = ativos ? "Baixar Excel (" + lista.length + ")" : "Baixar Excel";
+    var info = $("#respinfo"); info.textContent = "";
+    if (!entries.length) info.textContent = "Todas as entrevistas salvas aparecem aqui.";
+    else if (ativos) {
+      info.appendChild(document.createTextNode("Mostrando " + lista.length + " de " + entries.length + pl(entries.length, " entrevista.", " entrevistas.") + " "));
+      var lim = el("button", { class: "lnk", type: "button", text: "Limpar filtros" }); lim.addEventListener("click", respLimpar); info.appendChild(lim);
+    } else info.textContent = entries.length + pl(entries.length, " entrevista salva.", " entrevistas salvas.") + " Elas ficam guardadas até uma administradora excluir.";
     if (!entries.length) {
       host.appendChild(el("div", { class: "empty", text: "Nenhuma entrevista salva ainda. Preencha a primeira na aba Nova entrevista." }));
       return;
     }
+    if (!lista.length) {
+      host.appendChild(el("div", { class: "empty", text: "Nenhuma entrevista encontrada com essa busca ou esses filtros." }));
+      return;
+    }
     var tb = el("tbody");
-    entries.forEach(function (x) {
+    lista.forEach(function (x) {
       var acts = [];
       var ver = el("button", { class: "lnk", type: "button", text: openId === x.id ? "Fechar" : "Ver" });
       ver.addEventListener("click", function () { openId = openId === x.id ? null : x.id; renderResp(); });
@@ -1380,7 +1416,7 @@
   }
 
   function loadEntries() {
-    return store.list().then(function (rows) { entries = rows; FILTROS.forEach(function (f) { f.refresh(rows); }); renderAll(); })
+    return store.list().then(function (rows) { entries = rows; FILTROS.concat(RFILTROS).forEach(function (f) { f.refresh(rows); }); renderAll(); })
       .catch(function (err) { warn("Não foi possível carregar as entrevistas. " + ((err && err.message) || "Recarregue a página.")); });
   }
   $("#reload").addEventListener("click", loadEntries);
@@ -1460,8 +1496,8 @@
     say("");
     if (!window.XLSX) { say("Não foi possível carregar o gerador de Excel. Verifique a conexão e recarregue a página."); return; }
     var wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, entrevistasSheet(entries), "Entrevistas");
-    XLSX.utils.book_append_sheet(wb, indicadoresSheet(entries), "Indicadores");
+    XLSX.utils.book_append_sheet(wb, entrevistasSheet(respFiltradas()), "Entrevistas");
+    XLSX.utils.book_append_sheet(wb, indicadoresSheet(respFiltradas()), "Indicadores");
     XLSX.writeFile(wb, "entrevistas-desligamento-v2-" + today() + ".xlsx");
   });
   // Indicadores: o recorte que está na tela
