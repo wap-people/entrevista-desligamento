@@ -1,4 +1,4 @@
-# Entrevista de Desligamento V2
+# Entrevista de Desligamento
 
 Site estático (HTML/CSS/JS, sem build, sem npm) no GitHub Pages, com dados no Supabase. Mesmo padrão do repositório `wap-people/facilities.estoque`.
 

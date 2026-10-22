@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>Entrevista de Desligamento V2</title>
+<title>Entrevista de Desligamento</title>
 <link rel="icon" type="image/png" href="assets/favicon.png?v=1">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap">
-<link rel="stylesheet" href="styles.css?v=24">
+<link rel="stylesheet" href="styles.css?v=25">
 </head>
 <body>
 
@@ -17,7 +17,7 @@
 <div id="auth" class="auth" hidden>
   <form id="loginForm" novalidate>
     <img class="logo logo-lg" src="assets/logo-wap-waaw.webp?v=1" alt="WAP | WAAW by Alok" width="650" height="200">
-    <h1>Entrevista de Desligamento V2</h1>
+    <h1>Entrevista de Desligamento</h1>
     <p class="sub">Acesso restrito ao time de People.</p>
     <label for="loginEmail">E-mail<input id="loginEmail" type="email" autocomplete="username" required></label>
     <label for="loginPassword">Senha<input id="loginPassword" type="password" autocomplete="current-password" required></label>
@@ -28,7 +28,7 @@
   <form id="linkForm" novalidate hidden>
     <img class="logo logo-lg" src="assets/logo-wap-waaw.webp?v=1" alt="WAP | WAAW by Alok" width="650" height="200">
     <h1 id="linkTitle">Criar sua senha</h1>
-    <p class="sub">Entrevista de Desligamento V2 · time de People da WAP. Clique em Continuar para validar o seu link e criar a senha.</p>
+    <p class="sub">Entrevista de Desligamento · time de People da WAP. Clique em Continuar para validar o seu link e criar a senha.</p>
     <button class="btn" id="linkBtn" type="submit">Continuar</button>
     <p id="linkMsg" class="err" hidden></p>
   </form>
@@ -54,7 +54,7 @@
       <img class="logo" src="assets/logo-wap-waaw.webp?v=1" alt="WAP | WAAW by Alok" width="650" height="200">
       <div class="who"><span id="whoName"></span><button class="lnk" id="logoutBtn" type="button">Sair</button></div>
     </div>
-    <h1>Entrevista de Desligamento V2</h1>
+    <h1>Entrevista de Desligamento</h1>
     <p class="sub">WAP | WAAW by Alok. Preencha durante a conversa. Cada entrevista fica guardada, entra nos indicadores e pode ser baixada em Excel.</p>
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" id="tab-nova" aria-selected="true" aria-controls="p-nova">Nova entrevista</button>
@@ -102,8 +102,8 @@
         <div class="filters">
           <label for="fu">UNIDADE<select id="fu"></select></label>
           <label for="fo">ORIGEM<select id="fo">
-            <option value="">V2 e base 2024</option>
-            <option value="V2">Só V2</option>
+            <option value="">Atual e base 2024</option>
+            <option value="V2">Só atual</option>
             <option value="Base 2024">Só base 2024</option>
           </select></label>
           <div id="fms" class="row" style="align-items:flex-end;gap:12px 20px"></div>
@@ -162,11 +162,11 @@
     </div>
   </section>
 
-  <footer>As opções de entrevistador seguem o Google Forms da V2; as demais seguem as categorias da base atual. Ajuste conforme a versão final aprovada.</footer>
+  <footer>As opções de entrevistador seguem o Google Forms atual; as demais seguem as categorias da base atual. Ajuste conforme a versão final aprovada.</footer>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js?v=2"></script>
-<script src="app.js?v=29"></script>
+<script src="app.js?v=30"></script>
 </body>
 </html>

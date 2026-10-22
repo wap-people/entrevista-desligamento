@@ -1,4 +1,4 @@
-// Edge Function "admin-users": cadastro e gestão de usuários da Entrevista de Desligamento V2.
+// Edge Function "admin-users": cadastro e gestão de usuários da Entrevista de Desligamento.
 // Só administradores ativos (public.members.is_admin) podem chamar.
 // Publicada com verify_jwt = false: a própria função confere a sessão (auth.getUser) e o papel de admin.
 // Ações (POST JSON):

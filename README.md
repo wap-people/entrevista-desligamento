@@ -1,4 +1,4 @@
-# Entrevista de Desligamento V2 | WAP People
+# Entrevista de Desligamento | WAP People
 
 Formulário para o time de People conduzir e registrar entrevistas de desligamento, com indicadores (eNPS, motivos de saída, experiência) e exportação em Excel. Substitui o formato "ATUAL 2024".
 

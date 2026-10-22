@@ -1,4 +1,4 @@
-// Entrevista de Desligamento V2: login, formulário, indicadores, respostas, Excel e usuários.
+// Entrevista de Desligamento: login, formulário, indicadores, respostas, Excel e usuários.
 // Dados no Supabase (tabela public.entrevistas). Todo texto digitado é exibido com textContent.
 // Modo demonstração: abrir com ?demo=1 usa uma base em memória (nada é salvo) e pula o login.
 (function () {
@@ -101,6 +101,8 @@
     }).join(" ");
   }
   var NOMES = ["colaborador", "gestor", "entrevistador"];
+  // Origem para exibir: no banco as entrevistas deste sistema têm o código "V2"; na tela, "Atual"
+  function origemTxt(x) { var o = x.origem || "V2"; return o === "V2" ? "Atual" : o; }
   function nomesPadrao(x) { NOMES.forEach(function (k) { if (x[k]) x[k] = nomeProprio(x[k]); }); return x; }
   // banco usa snake_case; a página usa camelCase (como no protótipo)
   function toCamel(k) { return k.replace(/_([a-z])/g, function (m, c) { return c.toUpperCase(); }); }
@@ -177,7 +179,7 @@
     }
   };
 
-  // ?demo=1&exemplo=1: começa com 120 entrevistas fictícias (V2 e base 2024) para ver os indicadores.
+  // ?demo=1&exemplo=1: começa com 120 entrevistas fictícias (atuais e base 2024) para ver os indicadores.
   function demoSeed() {
     var seed = 7, rnd = function () { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
     var pickR = function (a) { return a[Math.floor(rnd() * a.length)]; };
@@ -569,7 +571,7 @@
     var host = $("#fchips"); host.textContent = "";
     var on = [];
     if (fu.value) on.push(fu.value);
-    if ($("#fo").value) on.push($("#fo").value === "V2" ? "Só V2" : "Só base 2024");
+    if ($("#fo").value) on.push($("#fo").value === "V2" ? "Só atual" : "Só base 2024");
     FILTROS.forEach(function (f) { var d = f.describe(); if (d) on.push(d); });
     if (!on.length) { host.appendChild(el("span", { class: "fchip off", text: "nenhum filtro ativo" })); return; }
     on.forEach(function (t) { host.appendChild(el("span", { class: "fchip", text: t })); });
@@ -1253,7 +1255,7 @@
         gauge(st.npsN ? st.nps : null, st.npsN),
         st.npsN ? el("div", { class: "nps-side" }, [legendRow(npsParts, true),
           el("p", { class: "kpi-s" + (st.npsN < 20 ? " kpi-w" : ""), text: (st.npsN < 20 ? "Base pequena: " : "Base: ") + st.npsN + pl(st.npsN, " nota", " notas") + (st.npsN < 20 ? ". Leia com cautela." : ". eNPS = % promotores − % detratores.") })])
-          : el("p", { class: "kpi-s", text: "Sem notas no filtro. A base 2024 não tinha esta pergunta; o eNPS vem das entrevistas do V2." })
+          : el("p", { class: "kpi-s", text: "Sem notas no filtro. A base 2024 não tinha esta pergunta; o eNPS vem das entrevistas atuais." })
       ]),
       zonasLegenda(st.npsN ? st.nps : null)
     ]);
@@ -1364,7 +1366,7 @@
     { k: "resultado", t: "Resultado", v: resultadoTxt,
       sv: function (x) { return x.aceitou === "Sim" ? (typeof x.nps === "number" ? x.nps : 11) : 12; },
       ord: ["Da menor para a maior nota", "Da maior para a menor nota"] },
-    { k: "origem", t: "Origem", v: function (x) { return x.origem || "V2"; } }
+    { k: "origem", t: "Origem", v: origemTxt }
   ];
   RCOLS.forEach(function (c) { c.sv = c.sv || function (x) { return fold(c.v(x)); }; c.ord = c.ord || AZ; });
   var rf = {}, rsort = null; // rf[coluna] = { keys: {chave: 1}, labels: [...] }; rsort = { k, dir: 1 | -1 }
@@ -1580,7 +1582,7 @@
       tb.appendChild(el("tr", null, [
         dt, el("td", { class: "nm", text: x.colaborador || "" }), el("td", { text: x.unidade || "" }), el("td", { text: x.setor || "" }),
         el("td", { text: x.gestor || "" }), el("td", { text: x.entrevistador || "" }),
-        el("td", { text: x.iniciativa || "" }), el("td", { text: resultadoTxt(x) }), el("td", { text: x.origem || "V2" }),
+        el("td", { text: x.iniciativa || "" }), el("td", { text: resultadoTxt(x) }), el("td", { text: origemTxt(x) }),
         el("td", { class: "act" }, acts)
       ]));
       if (openId === x.id) {
@@ -1588,6 +1590,7 @@
         COLS.forEach(function (c) {
           var v = x[c[0]]; if (v === undefined || v === "") return;
           if (c[0] === "data") v = brDate(v);
+          if (c[0] === "origem") v = origemTxt(x);
           if (c[0] === "criadoEm") v = brDateTime(v);
           if (c[0] === "legado") v = legadoTxt(v, "\n");
           dl.appendChild(el("dt", { text: c[1] })); dl.appendChild(el("dd", { text: String(v) }));
@@ -1625,6 +1628,7 @@
         var v = x[c[0]];
         if (v === undefined) return "";
         if (c[0] === "data") return brDate(v);
+        if (c[0] === "origem") return origemTxt(x);
         if (c[0] === "criadoEm") return brDateTime(v);
         if (c[0] === "legado") return legadoTxt(v, " | ");
         return v;
@@ -1678,7 +1682,7 @@
   function recorteTexto() {
     var on = [{ "": "Todas", vol: "Voluntárias", inv: "Involuntárias", sem: "Sem iniciativa registrada" }[tipoAtual]];
     if (fu.value) on.push(fu.value);
-    if ($("#fo").value) on.push($("#fo").value === "V2" ? "Só V2" : "Só base 2024");
+    if ($("#fo").value) on.push($("#fo").value === "V2" ? "Só atual" : "Só base 2024");
     FILTROS.forEach(function (f) { var d = f.describe(); if (d) on.push(d); });
     return on.join(" · ");
   }
@@ -1714,7 +1718,7 @@
       var wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, entrevistasSheet(respLista()), "Entrevistas");
       XLSX.utils.book_append_sheet(wb, indicadoresSheet(respLista()), "Indicadores");
-      XLSX.writeFile(wb, "entrevistas-desligamento-v2-" + today() + ".xlsx");
+      XLSX.writeFile(wb, "entrevistas-desligamento-" + today() + ".xlsx");
     }, say);
   });
   // Indicadores: o recorte que está na tela
@@ -1723,7 +1727,7 @@
   }
   function gerarRecorte() {
     var rows = filtered(), wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, sheet([["Indicadores · Entrevista de Desligamento V2"], ["Gerado em", brDateTime(new Date().toISOString())], ["Recorte", recorteTexto()], ["Entrevistas no recorte", rows.length]], [24, 90]), "Filtros");
+    XLSX.utils.book_append_sheet(wb, sheet([["Indicadores · Entrevista de Desligamento"], ["Gerado em", brDateTime(new Date().toISOString())], ["Recorte", recorteTexto()], ["Entrevistas no recorte", rows.length]], [24, 90]), "Filtros");
     XLSX.utils.book_append_sheet(wb, indicadoresSheet(rows), "Indicadores");
     XLSX.utils.book_append_sheet(wb, temasSheet(rows), "Temas das observações");
     XLSX.utils.book_append_sheet(wb, observacoesSheet(rows), "Observações");
@@ -1734,7 +1738,7 @@
   var printMode = false;
   function pdfPagina() {
     printMode = true;
-    $("#printHead").textContent = "Indicadores · Entrevista de Desligamento V2 · gerado em " + brDateTime(new Date().toISOString()) + " · Recorte: " + recorteTexto() + " · " + filtered().length + " entrevistas";
+    $("#printHead").textContent = "Indicadores · Entrevista de Desligamento · gerado em " + brDateTime(new Date().toISOString()) + " · Recorte: " + recorteTexto() + " · " + filtered().length + " entrevistas";
     document.body.classList.add("printing");
     renderAll();
     setTimeout(function () { window.print(); sairDoPdf(); }, 120);
@@ -1847,22 +1851,22 @@
   // no Outlook, o link vira o botão "Criar minha senha", clicável.
   function emailConvite(tipo, nome, email, link) {
     var primeiro = String(nome || "").split(" ")[0];
-    var assunto = tipo === "convite" ? "Seu acesso à Entrevista de Desligamento V2" : "Nova senha · Entrevista de Desligamento V2";
+    var assunto = tipo === "convite" ? "Seu acesso à Entrevista de Desligamento" : "Nova senha · Entrevista de Desligamento";
     var p = function (t, kids) { return el("p", { style: "margin:0 0 14px" }, kids || [document.createTextNode(t)]); };
     var botao = el("a", { href: link, style: "display:inline-block;background:#0094A1;color:#FFFFFF;text-decoration:none;font-weight:600;padding:10px 22px;border-radius:999px" , text: tipo === "convite" ? "Criar minha senha" : "Criar nova senha" });
     var site = el("a", { href: SITE_URL, text: "wap-people.github.io/entrevista-desligamento" });
     var corpo = el("div", { style: "font-family:Segoe UI,Arial,sans-serif;font-size:15px;line-height:1.5;color:#1A1A1A" }, [
       p(primeiro ? "Olá, " + primeiro + "!" : "Olá!"),
       p(tipo === "convite"
-        ? "Você recebeu acesso ao sistema Entrevista de Desligamento V2, do time de People da WAP. Para entrar pela primeira vez, clique no botão abaixo e crie a sua senha:"
-        : "Para criar uma nova senha no sistema Entrevista de Desligamento V2, clique no botão abaixo:"),
+        ? "Você recebeu acesso ao sistema Entrevista de Desligamento, do time de People da WAP. Para entrar pela primeira vez, clique no botão abaixo e crie a sua senha:"
+        : "Para criar uma nova senha no sistema Entrevista de Desligamento, clique no botão abaixo:"),
       p("", [botao]),
       p("O link é pessoal e só funciona uma vez. Se ele expirar, me avise que eu envio outro."),
       p("", [document.createTextNode("Depois disso, o acesso é sempre por "), site, document.createTextNode(", com o login " + email + ".")]),
       p(me && me.full_name ? me.full_name : "")
     ]);
     var texto = (primeiro ? "Olá, " + primeiro + "!" : "Olá!") + "\n\n" +
-      (tipo === "convite" ? "Você recebeu acesso ao sistema Entrevista de Desligamento V2, do time de People da WAP. Para entrar pela primeira vez, abra o link abaixo e crie a sua senha:\n" : "Para criar uma nova senha no sistema Entrevista de Desligamento V2, abra o link abaixo:\n") +
+      (tipo === "convite" ? "Você recebeu acesso ao sistema Entrevista de Desligamento, do time de People da WAP. Para entrar pela primeira vez, abra o link abaixo e crie a sua senha:\n" : "Para criar uma nova senha no sistema Entrevista de Desligamento, abra o link abaixo:\n") +
       link + "\n\nO link é pessoal e só funciona uma vez. Se ele expirar, me avise que eu envio outro.\n\n" +
       "Depois disso, o acesso é sempre por " + SITE_URL + ", com o login " + email + ".\n\n" + (me && me.full_name ? me.full_name : "");
     return { assunto: assunto, corpo: corpo, texto: texto };
