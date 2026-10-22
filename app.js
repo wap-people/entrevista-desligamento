@@ -320,23 +320,33 @@
   var acInp = $("#f-gestor"), acList = $("#gl-list"), acItems = [], acActive = -1;
   function mesmaArea(area, setor) { var a = fold(area), s = fold(setor); return !!(a && s && (a.indexOf(s) >= 0 || s.indexOf(a) >= 0)); }
   function acOpen(open) { acList.hidden = !open; acInp.setAttribute("aria-expanded", String(open)); if (!open) { acActive = -1; acInp.removeAttribute("aria-activedescendant"); } }
+  // Regiões: no TOTVS, São Marcos (matriz, PR) e Afonso Pena (CD na mesma região, PR) ficam no mesmo
+  // estabelecimento, então os gestores das duas aparecem juntos. Linhares, Serra e Eusébio têm os seus.
+  var REGIAO = { "Wap | São Marcos": "PR", "Wap | Afonso Pena": "PR", "Wap | Linhares": "Linhares", "Wap | Serra": "Serra", "Wap | Eusébio": "Eusébio" };
+  var NOME_REGIAO = { PR: "do Paraná (São Marcos e Afonso Pena)" };
+  // Áreas presentes no CD de Afonso Pena: sobem na lista quando a área ainda não foi marcada
+  var AREAS_AFONSO = /produc|exped|qualid|logist/;
   function acRender() {
-    var q = fold(acInp.value), un = S.unidade, setor = S.setor;
-    var rank = function (l) { return (l.unidade === un ? 2 : 0) + (mesmaArea(l.area, setor) ? 1 : 0); };
+    var q = fold(acInp.value), un = S.unidade, setor = S.setor, reg = REGIAO[un];
+    var perto = function (l) { return !!reg && REGIAO[l.unidade] === reg; };
+    var areaPrior = function (l) { return setor ? mesmaArea(l.area, setor) : (un === "Wap | Afonso Pena" && AREAS_AFONSO.test(fold(l.area))); };
+    var rank = function (l) { return (perto(l) ? 2 : 0) + (areaPrior(l) ? 1 : 0); };
     var ordena = function (a, b) { return rank(b) - rank(a) || a.nome.localeCompare(b.nome, "pt-BR"); };
+    var nomeLocal = un ? (NOME_REGIAO[reg] || "de " + un.replace("Wap | ", "")) : "";
+    var prioridade = setor ? " · área " + setor + " primeiro" : un === "Wap | Afonso Pena" ? " · Produção, Expedição, Qualidade e Logística primeiro" : "";
     var grupos = [], lim = 40;
     if (!q) {
       if (!un) { grupos.push({ titulo: "Marque a unidade para ver os gestores dela, ou digite um nome para buscar em todas.", itens: [] }); }
       else {
-        var daUn = lideres.filter(function (l) { return l.unidade === un; }).sort(ordena);
-        grupos.push({ titulo: daUn.length ? "Gestores de " + un.replace("Wap | ", "") + " (" + daUn.length + ")" + (setor ? " · área " + setor + " primeiro" : "") : "Nenhum gestor de " + un.replace("Wap | ", "") + " na lista. Digite um nome para buscar em todas as unidades.", itens: daUn.slice(0, lim) });
+        var daUn = lideres.filter(perto).sort(ordena);
+        grupos.push({ titulo: daUn.length ? "Gestores " + nomeLocal + " (" + daUn.length + ")" + prioridade : "Nenhum gestor " + nomeLocal + " na lista. Digite um nome para buscar em todas as unidades.", itens: daUn.slice(0, lim) });
         if (daUn.length > lim) grupos.push({ titulo: "Digite para ver os outros " + (daUn.length - lim) + ".", itens: [] });
       }
     } else {
       var termos = q.split(" ").filter(Boolean);
       var achados = lideres.filter(function (l) { var n = fold(l.nome); return termos.every(function (t) { return n.indexOf(t) >= 0; }); }).sort(ordena);
-      var aqui = achados.filter(function (l) { return un && l.unidade === un; }), fora = achados.filter(function (l) { return !(un && l.unidade === un); });
-      if (aqui.length) grupos.push({ titulo: "Em " + un.replace("Wap | ", ""), itens: aqui.slice(0, 20) });
+      var aqui = achados.filter(perto), fora = achados.filter(function (l) { return !perto(l); });
+      if (aqui.length) grupos.push({ titulo: "Gestores " + nomeLocal, itens: aqui.slice(0, 20) });
       if (fora.length) grupos.push({ titulo: un ? "Outras unidades" : "Gestores encontrados", itens: fora.slice(0, 20) });
       if (!achados.length) grupos.push({ titulo: "Nenhum gestor da lista com esse nome.", itens: [] });
     }
@@ -344,7 +354,7 @@
     grupos.forEach(function (g) {
       acList.appendChild(el("li", { class: "ac-h", role: "presentation", text: g.titulo }));
       g.itens.forEach(function (l) {
-        var li = el("li", { class: "ac-o", role: "option", id: "gl-o" + acItems.length }, [el("b", { text: l.nome }), el("span", { text: [l.cargo, l.area, l.unidade !== un ? l.unidade : ""].filter(Boolean).join(" · ") })]);
+        var li = el("li", { class: "ac-o", role: "option", id: "gl-o" + acItems.length }, [el("b", { text: l.nome }), el("span", { text: [l.cargo, l.area, perto(l) ? "" : String(l.unidade || "").replace("Wap | ", "")].filter(Boolean).join(" · ") })]);
         acItems.push({ el: li, nome: l.nome }); acList.appendChild(li);
       });
     });
