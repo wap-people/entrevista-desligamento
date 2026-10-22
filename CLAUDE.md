@@ -24,3 +24,4 @@ Site estático (HTML/CSS/JS, sem build, sem npm) no GitHub Pages, com dados no S
 - eNPS: detratores 0 a 6, neutros 7 e 8, promotores 9 e 10. `% promotores − % detratores`, arredondado, sobre quem deu nota.
 - "Aceitou participar = Não": salva só identificação, desligamento, motivo involuntário (se involuntária) e observações.
 - "Outro" grava `Outro: <texto>`; indicadores agrupam em "Outro".
+- Nomes (colaborador, gestor, entrevistador): `nomeProprio()` ao salvar e ao carregar. Primeira letra maiúscula, preposições (de, da, do, das, dos, e) em minúsculo.

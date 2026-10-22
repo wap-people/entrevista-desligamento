@@ -34,8 +34,8 @@
     { id: "entrevistadorOutro", label: "Outro: nome do entrevistador", type: "text", req: 1, when: function (s) { return s.entrevistador === "Outro"; } },
     { id: "unidade", label: "Unidade", type: "radio", options: UNIDADES, req: 1 },
     { id: "colaborador", label: "Nome completo do colaborador", type: "text", req: 1 },
-    { id: "setor", label: "Setor do colaborador", type: "combo", options: SETORES, req: 1 },
     { id: "gestor", label: "Gestor direto", type: "gestor", req: 1 },
+    { id: "setor", label: "Setor do colaborador", type: "combo", options: SETORES, req: 1 },
     { sec: "Desligamento", c: "--p2" },
     { id: "iniciativa", label: "De quem foi a iniciativa do desligamento?", type: "radio", options: INIC, req: 1 },
     { id: "aceitou", label: "O colaborador aceitou participar da entrevista de desligamento?", type: "radio", options: SN, req: 1 },
@@ -90,6 +90,18 @@
   function today() { var d = new Date(), p = function (n) { return String(n).padStart(2, "0"); }; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); }
   function brDate(s) { return s ? String(s).split("-").reverse().join("/") : ""; }
   function brDateTime(s) { return s ? new Date(s).toLocaleString("pt-BR") : ""; }
+  // Nomes de pessoas: primeira letra maiúscula e o resto minúsculo, preposições em minúsculo ("JOÃO DA SILVA" → "João da Silva")
+  var PREP = { de: 1, da: 1, "do": 1, das: 1, dos: 1, e: 1, di: 1, du: 1 };
+  function nomeProprio(s) {
+    s = String(s || "").trim().replace(/\s+/g, " ");
+    if (!s || /^não informad[oa]$/i.test(s)) return s;
+    return s.toLowerCase().split(" ").map(function (w, i) {
+      if (i > 0 && PREP[w]) return w;
+      return w.replace(/(^|[-'’])(\S)/g, function (m, sep, c) { return sep + c.toUpperCase(); });
+    }).join(" ");
+  }
+  var NOMES = ["colaborador", "gestor", "entrevistador"];
+  function nomesPadrao(x) { NOMES.forEach(function (k) { if (x[k]) x[k] = nomeProprio(x[k]); }); return x; }
   // banco usa snake_case; a página usa camelCase (como no protótipo)
   function toCamel(k) { return k.replace(/_([a-z])/g, function (m, c) { return c.toUpperCase(); }); }
   function toSnake(k) { return k.replace(/[A-Z]/g, function (c) { return "_" + c.toLowerCase(); }); }
@@ -371,11 +383,28 @@
     acActive = i;
     if (i >= 0) { acInp.setAttribute("aria-activedescendant", acItems[i].el.id); acItems[i].el.scrollIntoView({ block: "nearest" }); }
   }
-  var acPicking = false;
+  // Área do TOTVS → setor do formulário ("Produção Beneficiamento" → "Produção", "DADOS" → "Dados").
+  // Sem correspondência clara (ex.: "Marketing", que tem vários setores), não preenche.
+  var AREA_SETOR = { "almoxarifado de pos vendas": "Almox de Pós Vendas", "pmo": "PMO&BPM", "bpm": "PMO&BPM", "dho": "People", "operacoes de rh": "People",
+    "international": "Internacional", "operacoes ecom": "Operações Ecom", "producao injecao": "Produção", "producao beneficiamento": "Produção" };
+  function setorDoLider(area) {
+    var a = fold(area); if (!a) return "";
+    if (AREA_SETOR[a]) return AREA_SETOR[a];
+    var hit = SETORES.filter(function (s) { return fold(s) === a; });
+    return hit.length === 1 ? hit[0] : "";
+  }
+  var acPicking = false, setorAuto = "";
   function acPick(i) {
     acInp.value = acItems[i].nome;
     acPicking = true; acInp.dispatchEvent(new Event("input", { bubbles: true })); acPicking = false; // grava em S, valida e salva o rascunho
     acOpen(false);
+    // Gestor da lista: o setor do colaborador já vem com a área do gestor (pode ser trocado).
+    // Não sobrescreve um setor escolhido à mão; só o que foi preenchido por outro gestor.
+    var l = lideres.filter(function (x) { return fold(x.nome) === fold(acItems[i].nome); })[0];
+    var s = l ? setorDoLider(l.area) : "";
+    if (s && (!S.setor || S.setor === setorAuto)) {
+      var si = $("#f-setor"); si.value = s; si.dispatchEvent(new Event("input", { bubbles: true })); setorAuto = s;
+    }
   }
   acInp.addEventListener("focus", acRender);
   acInp.addEventListener("input", function () { if (!acPicking) acRender(); });
@@ -492,6 +521,7 @@
     delete doc.principalFatorOutro;
     if (doc.motivoInvoluntario === "Outro" && doc.motivoInvoluntarioOutro) doc.motivoInvoluntario = "Outro: " + doc.motivoInvoluntarioOutro;
     delete doc.motivoInvoluntarioOutro;
+    nomesPadrao(doc);
     doc.criadoPor = me.user_id;
     var btn = $("#save"); btn.disabled = true; btn.textContent = "Salvando";
     warn("");
@@ -1572,7 +1602,7 @@
   }
 
   function loadEntries() {
-    return store.list().then(function (rows) { entries = rows; FILTROS.forEach(function (f) { f.refresh(rows); }); renderAll(); })
+    return store.list().then(function (rows) { entries = rows.map(nomesPadrao); FILTROS.forEach(function (f) { f.refresh(rows); }); renderAll(); })
       .catch(function (err) { warn("Não foi possível carregar as entrevistas. " + ((err && err.message) || "Recarregue a página.")); });
   }
   $("#reload").addEventListener("click", loadEntries);
