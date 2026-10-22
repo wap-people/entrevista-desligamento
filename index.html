@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap">
-<link rel="stylesheet" href="styles.css?v=18">
+<link rel="stylesheet" href="styles.css?v=20">
 </head>
 <body>
 
@@ -124,6 +124,13 @@
         </div>
       </form>
     </div>
+    <div class="card" id="lidCard">
+      <h3>Lista de gestores</h3>
+      <p class="hint" id="lidInfo">Carregando…</p>
+      <p class="hint">Para atualizar, envie o relatório de colaboradores ativos do TOTVS (.xml). O arquivo é lido aqui no navegador: só nome, cargo, área e unidade de quem tem cargo de liderança são gravados. CPF, PIS, telefones, e-mails e datas não saem do seu computador.</p>
+      <label class="btn sm ghost file-btn">Escolher arquivo .xml<input type="file" id="lidFile" accept=".xml,text/xml"></label>
+      <div id="lidPrev"></div>
+    </div>
     <div id="usrmsg" class="notice" hidden></div>
     <div id="usr-body"></div>
     <div class="chart">
@@ -138,6 +145,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="config.js?v=2"></script>
-<script src="app.js?v=16"></script>
+<script src="app.js?v=20"></script>
 </body>
 </html>

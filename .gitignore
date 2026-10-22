@@ -4,3 +4,5 @@ Thumbs.db
 .env.*
 supabase/.temp/
 *.xlsx
+# relatórios do TOTVS (dados pessoais): nunca versionar
+*.xml

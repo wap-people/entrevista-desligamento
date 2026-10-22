@@ -35,7 +35,7 @@
     { id: "unidade", label: "Unidade", type: "radio", options: UNIDADES, req: 1 },
     { id: "colaborador", label: "Nome completo do colaborador", type: "text", req: 1 },
     { id: "setor", label: "Setor do colaborador", type: "combo", options: SETORES, req: 1 },
-    { id: "gestor", label: "Gestor direto", type: "text", req: 1 },
+    { id: "gestor", label: "Gestor direto", type: "gestor", req: 1 },
     { sec: "Desligamento", c: "--p2" },
     { id: "iniciativa", label: "De quem foi a iniciativa do desligamento?", type: "radio", options: INIC, req: 1 },
     { id: "aceitou", label: "O colaborador aceitou participar da entrevista de desligamento?", type: "radio", options: SN, req: 1 },
@@ -133,6 +133,16 @@
       return Promise.all([q("criou"), q("excluiu")]).then(function (v) { return { criou: v[0], excluiu: v[1] }; });
     },
     // Rascunho da entrevista em andamento, no servidor (um por usuária)
+    // Gestores (cargos de liderança do TOTVS): só nome, cargo, área e unidade
+    lideres: function () {
+      return sb.from("lideres").select("nome, cargo, area, unidade, atualizado_em").order("nome").then(function (r) { if (r.error) throw r.error; return r.data; });
+    },
+    lideresReplace: function (rows) {
+      return sb.from("lideres").delete().gt("id", 0).then(function (r) {
+        if (r.error) throw r.error;
+        return sb.from("lideres").insert(rows).then(function (r2) { if (r2.error) throw r2.error; });
+      });
+    },
     draftGet: function () {
       return sb.from("rascunhos").select("dados, atualizado_em").eq("user_id", me.user_id).maybeSingle().then(function (r) { if (r.error) throw r.error; return r.data; });
     },
@@ -182,6 +192,8 @@
   }
   function demoStore() {
     var rows = /[?&]exemplo=1\b/.test(location.search) ? demoSeed() : [], log = [], seq = 0, draft = null;
+    // Gestores fictícios para o modo demonstração (nomes inventados)
+    var lideresDemo = [["Ana Fictícia Lopes", "Coordenador de Logística", "Logística", "Wap | Linhares"], ["Bruno Exemplo Dias", "Líder de Produção", "Produção", "Wap | Linhares"], ["Carla Teste Ramos", "Supervisor de Qualidade", "Qualidade", "Wap | Linhares"], ["Diego Modelo Souza", "Gerente de Logística", "Logística", "Wap | São Marcos"], ["Elisa Amostra Reis", "Head de Marketing", "Marketing", "Wap | São Marcos"], ["Fábio Demo Nunes", "Coordenador de Produção", "Produção", "Wap | São Marcos"], ["Gabriela Simulada Melo", "Coordenador de Logística", "Logística", "Wap | Serra"], ["Hugo Ensaio Costa", "Supervisor de Logística", "Logística", "Wap | Eusébio"]].map(function (a) { return { nome: a[0], cargo: a[1], area: a[2], unidade: a[3], atualizado_em: new Date().toISOString() }; });
     var users = [{ user_id: "demo", email: "demo@wap.ind.br", full_name: "Ana Beatriz Capistrano Esteves", is_admin: true, active: true }];
     var ok = function (v) { return Promise.resolve(v); };
     return {
@@ -199,6 +211,8 @@
       },
       members: function () { return ok(users); },
       audit: function () { return ok({ criou: log.filter(function (a) { return a.acao === "criou"; }), excluiu: log.filter(function (a) { return a.acao === "excluiu"; }) }); },
+      lideres: function () { return ok(lideresDemo); },
+      lideresReplace: function (rs) { lideresDemo = rs.map(function (r) { return Object.assign({ atualizado_em: new Date().toISOString() }, r); }); return ok(); },
       draftGet: function () { return ok(draft); },
       draftSave: function (dados) { draft = { dados: JSON.parse(JSON.stringify(dados)), atualizado_em: new Date().toISOString() }; return ok(); },
       draftDelete: function () { draft = null; return ok(); },
@@ -246,13 +260,17 @@
           inp.setAttribute("data-combo", "1");
           extra = el("datalist", { id: "dl-" + f.id });
           f.options.forEach(function (o) { extra.appendChild(el("option", { value: o })); });
+        } else if (f.type === "gestor") {
+          // Caixa com sugestões de gestores (ver "Campo Gestor direto" mais abaixo); aceita nome fora da lista
+          inp = el("input", { id: "f-" + f.id, type: "text", autocomplete: "off", role: "combobox", "aria-autocomplete": "list", "aria-expanded": "false", "aria-controls": "gl-list", placeholder: "Digite o nome ou escolha da lista" });
+          extra = el("ul", { id: "gl-list", class: "ac-list", role: "listbox", hidden: "" });
         } else if (f.type === "textarea") {
           inp = el("textarea", { id: "f-" + f.id, rows: "4" });
         } else {
           inp = el("input", { id: "f-" + f.id, type: f.type });
         }
         inp.setAttribute("data-f", f.id);
-        body = el("div", null, [lb, inp, extra]);
+        body = el("div", f.type === "gestor" ? { class: "ac" } : null, [lb, inp, extra]);
       }
       node.appendChild(body);
       node.appendChild(el("p", { class: "err", text: f.type === "combo" ? "Escolha uma área da lista." : "Responda esta pergunta.", hidden: "" }));
@@ -293,6 +311,75 @@
     applyVisibility();
     scheduleDraft();
   });
+
+  /* ---------- Campo "Gestor direto": sugestões de gestores ----------
+     Sem digitar: gestores da unidade marcada, os da mesma área primeiro.
+     Digitando: busca em todas as unidades (os da unidade marcada primeiro).
+     Sempre dá para usar um nome que não está na lista (ex.: gestor que já saiu). */
+  var lideres = [];
+  var acInp = $("#f-gestor"), acList = $("#gl-list"), acItems = [], acActive = -1;
+  function mesmaArea(area, setor) { var a = fold(area), s = fold(setor); return !!(a && s && (a.indexOf(s) >= 0 || s.indexOf(a) >= 0)); }
+  function acOpen(open) { acList.hidden = !open; acInp.setAttribute("aria-expanded", String(open)); if (!open) { acActive = -1; acInp.removeAttribute("aria-activedescendant"); } }
+  function acRender() {
+    var q = fold(acInp.value), un = S.unidade, setor = S.setor;
+    var rank = function (l) { return (l.unidade === un ? 2 : 0) + (mesmaArea(l.area, setor) ? 1 : 0); };
+    var ordena = function (a, b) { return rank(b) - rank(a) || a.nome.localeCompare(b.nome, "pt-BR"); };
+    var grupos = [], lim = 40;
+    if (!q) {
+      if (!un) { grupos.push({ titulo: "Marque a unidade para ver os gestores dela, ou digite um nome para buscar em todas.", itens: [] }); }
+      else {
+        var daUn = lideres.filter(function (l) { return l.unidade === un; }).sort(ordena);
+        grupos.push({ titulo: daUn.length ? "Gestores de " + un.replace("Wap | ", "") + " (" + daUn.length + ")" + (setor ? " · área " + setor + " primeiro" : "") : "Nenhum gestor de " + un.replace("Wap | ", "") + " na lista. Digite um nome para buscar em todas as unidades.", itens: daUn.slice(0, lim) });
+        if (daUn.length > lim) grupos.push({ titulo: "Digite para ver os outros " + (daUn.length - lim) + ".", itens: [] });
+      }
+    } else {
+      var termos = q.split(" ").filter(Boolean);
+      var achados = lideres.filter(function (l) { var n = fold(l.nome); return termos.every(function (t) { return n.indexOf(t) >= 0; }); }).sort(ordena);
+      var aqui = achados.filter(function (l) { return un && l.unidade === un; }), fora = achados.filter(function (l) { return !(un && l.unidade === un); });
+      if (aqui.length) grupos.push({ titulo: "Em " + un.replace("Wap | ", ""), itens: aqui.slice(0, 20) });
+      if (fora.length) grupos.push({ titulo: un ? "Outras unidades" : "Gestores encontrados", itens: fora.slice(0, 20) });
+      if (!achados.length) grupos.push({ titulo: "Nenhum gestor da lista com esse nome.", itens: [] });
+    }
+    acList.textContent = ""; acItems = [];
+    grupos.forEach(function (g) {
+      acList.appendChild(el("li", { class: "ac-h", role: "presentation", text: g.titulo }));
+      g.itens.forEach(function (l) {
+        var li = el("li", { class: "ac-o", role: "option", id: "gl-o" + acItems.length }, [el("b", { text: l.nome }), el("span", { text: [l.cargo, l.area, l.unidade !== un ? l.unidade : ""].filter(Boolean).join(" · ") })]);
+        acItems.push({ el: li, nome: l.nome }); acList.appendChild(li);
+      });
+    });
+    var txt = acInp.value.trim();
+    if (txt && !lideres.some(function (l) { return fold(l.nome) === fold(txt); })) {
+      var livre = el("li", { class: "ac-o ac-free", role: "option", id: "gl-o" + acItems.length, text: "Usar “" + txt + "” (não está na lista)" });
+      acItems.push({ el: livre, nome: txt }); acList.appendChild(livre);
+    }
+    acItems.forEach(function (it, i) { it.el.addEventListener("mousedown", function (e) { e.preventDefault(); acPick(i); }); });
+    acActive = -1; acOpen(true);
+  }
+  function acHighlight(i) {
+    acItems.forEach(function (it, k) { it.el.classList.toggle("on", k === i); it.el.setAttribute("aria-selected", String(k === i)); });
+    acActive = i;
+    if (i >= 0) { acInp.setAttribute("aria-activedescendant", acItems[i].el.id); acItems[i].el.scrollIntoView({ block: "nearest" }); }
+  }
+  var acPicking = false;
+  function acPick(i) {
+    acInp.value = acItems[i].nome;
+    acPicking = true; acInp.dispatchEvent(new Event("input", { bubbles: true })); acPicking = false; // grava em S, valida e salva o rascunho
+    acOpen(false);
+  }
+  acInp.addEventListener("focus", acRender);
+  acInp.addEventListener("input", function () { if (!acPicking) acRender(); });
+  acInp.addEventListener("blur", function () { setTimeout(function () { acOpen(false); }, 120); });
+  acInp.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault(); if (acList.hidden) acRender();
+      if (!acItems.length) return;
+      var n = acItems.length, i = acActive < 0 ? (e.key === "ArrowDown" ? 0 : n - 1) : (acActive + (e.key === "ArrowDown" ? 1 : n - 1)) % n;
+      acHighlight(i);
+    } else if (e.key === "Enter" && !acList.hidden && acActive >= 0) { e.preventDefault(); acPick(acActive); }
+    else if (e.key === "Escape") { acOpen(false); }
+  });
+  function loadLideres() { return store.lideres().then(function (r) { lideres = r || []; renderLideresAdmin(); }).catch(function () { lideres = []; }); }
 
   /* ---------- Rascunho no servidor ----------
      Salva a entrevista em andamento ~1 s depois de cada resposta (e ao sair da aba).
@@ -1487,6 +1574,77 @@
       .then(function () { if (!$("#usrmsg").classList.contains("warn")) $("#newUser").reset(); btn.disabled = false; });
   });
 
+  /* ---------- Lista de gestores: atualização pelo relatório do TOTVS (só admins) ----------
+     O XML (planilha do Excel 2003 exportada do TOTVS) é lido no navegador. Só nome, cargo, área e unidade
+     de quem tem cargo de liderança são enviados ao banco; o resto do arquivo não sai do computador. */
+  var UNID_TOTVS = { "1": "Wap | São Marcos", "3": "Wap | Eusébio", "9": "Wap | Eusébio", "11": "Wap | Linhares", "12": "Wap | Serra" };
+  var CARGO_LIDER = /(lider|supervis|coorden|gerent|head|diret)|^ceo$|^cfo$/;
+  function tituloNome(s) {
+    var peq = { de: 1, da: 1, "do": 1, das: 1, dos: 1, e: 1, em: 1, a: 1, o: 1, no: 1, na: 1, nos: 1, nas: 1 };
+    var sigla = /^(ceo|cfo|ti|ia|rh|pcp|pmo&bpm|r&s|t&d|dho|comex|jr|pl|sr)$/;
+    return String(s).trim().replace(/\s+/g, " ").toLowerCase().split(" ").map(function (w, i) {
+      if (i > 0 && peq[w]) return w; if (sigla.test(w)) return w.toUpperCase(); return w.charAt(0).toUpperCase() + w.slice(1);
+    }).join(" ");
+  }
+  function lerTotvs(texto) {
+    var NS = "urn:schemas-microsoft-com:office:spreadsheet";
+    var doc = new DOMParser().parseFromString(texto, "text/xml");
+    if (doc.getElementsByTagName("parsererror").length) throw { message: "O arquivo não é um XML válido." };
+    var linhas = [].map.call(doc.getElementsByTagNameNS(NS, "Row"), function (row) {
+      var out = [], col = 0;
+      [].forEach.call(row.getElementsByTagNameNS(NS, "Cell"), function (c) {
+        var idx = c.getAttributeNS(NS, "Index"); if (idx) col = Number(idx) - 1;
+        var d = c.getElementsByTagNameNS(NS, "Data")[0]; out[col] = d ? d.textContent.trim() : ""; col++;
+      });
+      return out;
+    });
+    var h = linhas.findIndex(function (l) { return l.indexOf("Nome") >= 0 && l.some(function (c) { return /^Cargo/.test(c || ""); }); });
+    if (h < 0) throw { message: "Não encontrei as colunas “Nome” e “Cargo” — é o relatório de colaboradores ativos do TOTVS?" };
+    var cab = linhas[h], iN = cab.indexOf("Nome"), iC = cab.findIndex(function (c) { return /^Cargo/.test(c || ""); }),
+      iA = cab.findIndex(function (c) { return /^Centro Custo-Desc/.test(c || ""); }), iE = cab.indexOf("Estabelecimento");
+    var lid = [], semUnidade = {}, total = 0;
+    linhas.slice(h + 1).forEach(function (l) {
+      if (!l[iN]) return; total++;
+      if (!CARGO_LIDER.test(fold(l[iC]))) return;
+      var un = UNID_TOTVS[String(l[iE] || "").trim()];
+      if (!un) semUnidade[l[iE] || "(vazio)"] = (semUnidade[l[iE] || "(vazio)"] || 0) + 1;
+      lid.push({ nome: tituloNome(l[iN]), cargo: tituloNome(l[iC]), area: (l[iA] || "").trim() || null, unidade: un || "Não identificada" });
+    });
+    return { lideres: lid, total: total, semUnidade: semUnidade };
+  }
+  function porUnidade(rows) { var m = {}; rows.forEach(function (r) { m[r.unidade] = (m[r.unidade] || 0) + 1; }); return Object.keys(m).sort(function (a, b) { return m[b] - m[a]; }).map(function (k) { return k.replace("Wap | ", "") + " " + m[k]; }).join(" · "); }
+  function renderLideresAdmin() {
+    var info = $("#lidInfo"); if (!info) return;
+    if (!lideres.length) { info.textContent = "Nenhum gestor cadastrado ainda."; return; }
+    var quando = lideres.reduce(function (m, l) { return l.atualizado_em > m ? l.atualizado_em : m; }, "");
+    info.textContent = lideres.length + " gestores · atualizada em " + brDateTime(quando) + " · " + porUnidade(lideres);
+  }
+  $("#lidFile").addEventListener("change", function (e) {
+    var f = e.target.files[0], prev = $("#lidPrev"); prev.textContent = ""; usrSay("");
+    if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () {
+      var r;
+      try { r = lerTotvs(rd.result); } catch (err) { usrSay((err && err.message) || "Não foi possível ler o arquivo.", true); e.target.value = ""; return; }
+      var sem = Object.keys(r.semUnidade);
+      prev.appendChild(el("div", { class: "notice" }, [
+        el("p", { text: "Arquivo com " + r.total + " colaboradores. Encontrei " + r.lideres.length + " gestores (líder, supervisor, coordenador, gerente, head, diretor, CEO, CFO): " + porUnidade(r.lideres) + "." }),
+        sem.length ? el("p", { class: "err", text: "Estabelecimentos sem unidade definida (os gestores entram como “Não identificada”): " + sem.map(function (k) { return k + " (" + r.semUnidade[k] + ")"; }).join(", ") + "." }) : null,
+        el("p", { text: "Isso substitui a lista atual de " + lideres.length + " gestores." })
+      ]));
+      var ok = el("button", { class: "btn sm", type: "button", text: "Substituir lista (" + r.lideres.length + " gestores)" });
+      var no = el("button", { class: "lnk", type: "button", text: "Cancelar" });
+      no.addEventListener("click", function () { prev.textContent = ""; e.target.value = ""; });
+      ok.addEventListener("click", function () {
+        ok.disabled = true; ok.textContent = "Gravando…";
+        store.lideresReplace(r.lideres).then(function () { prev.textContent = ""; e.target.value = ""; usrSay("Lista de gestores atualizada: " + r.lideres.length + " gestores."); return loadLideres(); })
+          .catch(function (err) { ok.disabled = false; ok.textContent = "Substituir lista"; usrSay("Não foi possível gravar: " + ((err && err.message) || ""), true); });
+      });
+      prev.appendChild(el("div", { class: "row", style: "margin-top:8px" }, [ok, no]));
+    };
+    rd.readAsText(f, "utf-8");
+  });
+
   /* ---------- Login e início ---------- */
   function showAuth(msg) {
     $("#app").hidden = true; $("#auth").hidden = false;
@@ -1501,6 +1659,7 @@
     if (DEMO) warn("Modo demonstração: nada é salvo e os dados somem ao recarregar.");
     reset();
     offerDraft();
+    loadLideres();
     renderAll();
     loadEntries();
     loadMembers().then(renderResp).catch(function () {});
