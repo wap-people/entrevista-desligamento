@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png?v=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap">
-<link rel="stylesheet" href="styles.css?v=10">
+<link rel="stylesheet" href="styles.css?v=11">
 </head>
 <body>
 
@@ -51,6 +51,10 @@
   <div id="dbwarn" class="notice warn" hidden></div>
 
   <section id="p-nova" role="tabpanel" aria-labelledby="tab-nova">
+    <div id="draftBanner" class="notice draft-b" hidden>
+      <p id="draftTxt"></p>
+      <div class="row"><button class="btn sm" id="draftResume" type="button">Retomar rascunho</button><button class="lnk danger" id="draftDiscard" type="button">Descartar rascunho</button></div>
+    </div>
     <form id="f" novalidate></form>
     <div id="done" class="done" hidden>
       <h2 id="donetxt">Entrevista salva</h2>
@@ -127,6 +131,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="config.js?v=2"></script>
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

@@ -130,6 +130,16 @@
     audit: function () {
       return sb.from("auditoria").select("*").order("em", { ascending: false }).limit(200).then(function (r) { if (r.error) throw r.error; return r.data; });
     },
+    // Rascunho da entrevista em andamento, no servidor (um por usuária)
+    draftGet: function () {
+      return sb.from("rascunhos").select("dados, atualizado_em").eq("user_id", me.user_id).maybeSingle().then(function (r) { if (r.error) throw r.error; return r.data; });
+    },
+    draftSave: function (dados) {
+      return sb.from("rascunhos").upsert({ user_id: me.user_id, dados: dados, atualizado_em: new Date().toISOString() }, { onConflict: "user_id" }).then(function (r) { if (r.error) throw r.error; });
+    },
+    draftDelete: function () {
+      return sb.from("rascunhos").delete().eq("user_id", me.user_id).then(function (r) { if (r.error) throw r.error; });
+    },
     admin: function (payload) {
       return sb.functions.invoke("admin-users", { body: payload }).then(function (r) {
         if (r.error) {
@@ -169,7 +179,7 @@
     return out;
   }
   function demoStore() {
-    var rows = /[?&]exemplo=1\b/.test(location.search) ? demoSeed() : [], log = [], seq = 0;
+    var rows = /[?&]exemplo=1\b/.test(location.search) ? demoSeed() : [], log = [], seq = 0, draft = null;
     var users = [{ user_id: "demo", email: "demo@wap.ind.br", full_name: "Ana Beatriz Capistrano Esteves", is_admin: true, active: true }];
     var ok = function (v) { return Promise.resolve(v); };
     return {
@@ -186,6 +196,9 @@
       },
       members: function () { return ok(users); },
       audit: function () { return ok(log); },
+      draftGet: function () { return ok(draft); },
+      draftSave: function (dados) { draft = { dados: JSON.parse(JSON.stringify(dados)), atualizado_em: new Date().toISOString() }; return ok(); },
+      draftDelete: function () { draft = null; return ok(); },
       admin: function () { return Promise.reject({ message: "Indisponível no modo demonstração." }); }
     };
   }
@@ -247,7 +260,7 @@
   });
 
   form.appendChild(el("div", { class: "bar" }, [
-    el("p", { class: "prog", id: "prog", "aria-live": "polite" }),
+    el("div", { class: "bar-info" }, [el("p", { class: "prog", id: "prog", "aria-live": "polite" }), el("p", { class: "draft-st", id: "draftSt", "aria-live": "polite" })]),
     el("button", { class: "btn", type: "submit", id: "save", text: "Salvar entrevista" })
   ]));
 
@@ -275,7 +288,63 @@
     }
     var q = t.closest(".q"); if (q) { q.classList.remove("bad"); q.querySelector(".err").hidden = true; }
     applyVisibility();
+    scheduleDraft();
   });
+
+  /* ---------- Rascunho no servidor ----------
+     Salva a entrevista em andamento ~1 s depois de cada resposta (e ao sair da aba).
+     Ao entrar, oferece retomar ou descartar. Enquanto houver um rascunho anterior sem decisão,
+     o salvamento automático fica parado para não sobrescrevê-lo. */
+  var draftTimer = null, draftOn = false, draftRetry = null;
+  function hora(iso) { return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); }
+  function draftSay(t, bad) { var s = $("#draftSt"); s.textContent = t || ""; s.classList.toggle("bad", !!bad); }
+  // Há algo além do que o formulário já traz preenchido (data e entrevistador)?
+  function hasContent(s) { return Object.keys(s || {}).some(function (k) { return k !== "data" && k !== "entrevistador" && s[k] !== "" && s[k] !== undefined; }); }
+  function draftData() { return { S: S, setorTexto: ($("#f-setor") || {}).value || "" }; }
+  function scheduleDraft() {
+    if (!me || !draftOn) return;
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(saveDraft, 1000);
+  }
+  function saveDraft() {
+    clearTimeout(draftTimer); draftTimer = null; clearTimeout(draftRetry);
+    if (!me || !draftOn || !hasContent(S)) return Promise.resolve();
+    draftSay("Salvando rascunho…");
+    return store.draftSave(draftData()).then(function () { draftSay("Rascunho salvo às " + hora(new Date().toISOString()) + ". Se a página fechar, você retoma daqui."); })
+      .catch(function () { draftSay("Rascunho não salvo: sem conexão com o servidor. Tentando de novo…", true); draftRetry = setTimeout(saveDraft, 10000); });
+  }
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden" && draftTimer) saveDraft(); });
+  function restoreDraft(d) {
+    S = Object.assign({}, d.S || {});
+    form.reset();
+    Object.keys(S).forEach(function (k) {
+      var v = S[k];
+      var r = form.querySelector('input[type=radio][name="' + CSS.escape(k) + '"][value="' + CSS.escape(String(v)) + '"]');
+      if (r) { r.checked = true; return; }
+      var i = $("#f-" + k); if (i) i.value = v;
+    });
+    // Setor: o nome oficial da lista quando a digitação bateu; senão, o texto que estava digitado
+    if ($("#f-setor")) $("#f-setor").value = S.setor || d.setorTexto || "";
+    applyVisibility();
+  }
+  function offerDraft() {
+    var box = $("#draftBanner"); box.hidden = true; draftOn = false;
+    return store.draftGet().then(function (r) {
+      if (!r || !r.dados || !hasContent(r.dados.S)) { draftOn = true; return; }
+      var nome = r.dados.S.colaborador ? "de " + r.dados.S.colaborador : "sem nome do colaborador";
+      var d = new Date(r.atualizado_em);
+      $("#draftTxt").textContent = "Você tem uma entrevista em andamento " + nome + ", salva em " + d.toLocaleDateString("pt-BR") + " às " + hora(r.atualizado_em) + ".";
+      box.hidden = false;
+      var discard = $("#draftDiscard"); discard.textContent = "Descartar rascunho"; discard.dataset.armed = "";
+      $("#draftResume").onclick = function () { restoreDraft(r.dados); box.hidden = true; draftOn = true; draftSay("Rascunho retomado. As próximas respostas continuam sendo salvas."); };
+      discard.onclick = function () {
+        if (!discard.dataset.armed) { discard.dataset.armed = "1"; discard.textContent = "Confirmar descarte"; return; }
+        store.draftDelete().then(function () { box.hidden = true; draftOn = true; draftSay("Rascunho descartado."); scheduleDraft(); })
+          .catch(function () { draftSay("Não foi possível descartar o rascunho agora.", true); });
+      };
+      draftSay("Há um rascunho anterior: retome ou descarte para o salvamento automático continuar.", true);
+    }).catch(function () { draftOn = true; draftSay("Não foi possível verificar rascunhos salvos agora.", true); });
+  }
 
   function reset() {
     S = {};
@@ -326,7 +395,10 @@
     doc.criadoPor = me.user_id;
     var btn = $("#save"); btn.disabled = true; btn.textContent = "Salvando";
     warn("");
+    clearTimeout(draftTimer); draftTimer = null; clearTimeout(draftRetry);
     store.insert(doc).then(function () {
+      // Entrevista gravada: o rascunho deixa de ser necessário
+      store.draftDelete().then(function () { draftSay(""); }, function () { draftSay(""); });
       $("#donetxt").textContent = "Entrevista de " + doc.colaborador + " salva";
       form.hidden = true; $("#done").hidden = false; window.scrollTo(0, 0);
       return loadEntries();
@@ -833,7 +905,7 @@
     var val = el("div", { class: "gauge-v" }, [el("b", { text: v === null ? "–" : signed(v) }), el("span", { text: n ? n + pl(n, " nota", " notas") : "sem notas" })]);
     return el("div", { class: "gauge-w", role: "img", "aria-label": v === null ? "eNPS sem notas" : "eNPS " + v + " numa escala de −100 a +100" }, [s, val]);
   }
-  if (DEMO) window.__wapTest = { gauge: gauge, gaugeAngle: gaugeAngle, gaugePoint: gaugePoint, GAUGE: GAUGE }; // só no modo demonstração, para validar o medidor
+  if (DEMO) window.__wapTest = { gauge: gauge, gaugeAngle: gaugeAngle, gaugePoint: gaugePoint, GAUGE: GAUGE, reset: function () { reset(); }, offerDraft: function () { return offerDraft(); }, state: function () { return S; } }; // só no modo demonstração, para validar medidor e rascunho
   // Barrinha empilhada para os cartões: partes [{n, cls, label}]
   function minibar(parts, key) {
     var tot = parts.reduce(function (a, p) { return a + p.n; }, 0), b = el("div", { class: "mb" });
@@ -1234,6 +1306,7 @@
     $("#tab-usr").hidden = !me.is_admin;
     if (DEMO) warn("Modo demonstração: nada é salvo e os dados somem ao recarregar.");
     reset();
+    offerDraft();
     renderAll();
     loadEntries();
     loadMembers().then(renderResp).catch(function () {});
@@ -1263,7 +1336,8 @@
 
   $("#logoutBtn").addEventListener("click", function () {
     if (DEMO) { location.href = location.pathname; return; }
-    sb.auth.signOut().then(function () { location.reload(); });
+    // salva o rascunho pendente antes de sair
+    (draftTimer ? saveDraft() : Promise.resolve()).then(function () { return sb.auth.signOut(); }).then(function () { location.reload(); });
   });
 
   if (DEMO) { enter({ user_id: "demo", email: "demo@wap.ind.br", full_name: "Ana Beatriz Capistrano Esteves", is_admin: true }); return; }

@@ -8,7 +8,7 @@ Formulário para o time de People conduzir e registrar entrevistas de desligamen
 
 ## Telas
 
-1. **Nova entrevista**: formulário em seções, com perguntas condicionais e validação. O entrevistador já vem marcado com o usuário logado.
+1. **Nova entrevista**: formulário em seções, com perguntas condicionais e validação. O entrevistador já vem marcado com o usuário logado. **Rascunho no servidor**: a entrevista em andamento é salva automaticamente no Supabase (tabela `rascunhos`, um por usuária) cerca de 1 s após cada resposta; ao voltar, o site oferece retomar ou descartar. O rascunho é apagado quando a entrevista é salva.
 2. **Indicadores**: painel. No topo, o tipo de saída (Todas, Voluntárias, Involuntárias, Sem iniciativa) e o painel de filtros (unidade, origem, mês, gestor, área, entrevistador) com etiquetas do que está ativo. Abaixo, o resumo em cartão, a faixa de indicadores com mini-gráficos (tendência, composição, adesão, medidor do eNPS, voltariam) e os módulos: cada um mostra o número principal e abre o detalhe ao clicar. Respostas abertas aparecem num padrão só de maiúsculas.
 3. **Respostas**: lista, detalhe, **Baixar Excel** (abas Entrevistas e Indicadores) e exclusão com dois cliques (só administradoras).
 4. **Usuários** (só administradoras): criar usuário, trocar senha, dar ou tirar admin, desativar. Mostra a auditoria de quem registrou e quem excluiu cada entrevista.

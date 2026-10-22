@@ -13,7 +13,7 @@ Site estático (HTML/CSS/JS, sem build, sem npm) no GitHub Pages, com dados no S
 ## Regras
 1. Ao mudar `app.js`, `styles.css` ou `config.js`, aumentar o `?v=` em `index.html`.
 2. Mudança de banco = novo arquivo numerado em `supabase/migrations/`. Nunca editar migração já aplicada.
-3. RLS: só `members` ativos leem e criam entrevistas; só admins excluem; ninguém edita. `auditoria` é gravada só por trigger.
+3. RLS: só `members` ativos leem e criam entrevistas; só admins excluem; ninguém edita. `auditoria` é gravada só por trigger. `rascunhos`: cada usuária lê e grava só o próprio.
 4. Nunca colocar a chave `service_role` em código, commit ou mensagem.
 5. Usuários são criados por uma administradora pela aba Usuários, não pelo Claude.
 6. O banco é produção com dados sensíveis de RH. Testar com `?demo=1` ou pedir confirmação antes de gravar.

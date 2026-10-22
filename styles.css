@@ -359,3 +359,9 @@ footer { padding-block: 40px 56px; color: var(--muted); font-size: 13px; }
   .kpi-nps { grid-column: auto; }
   .nps-body { grid-template-columns: 1fr; }
 }
+/* Rascunho no servidor: aviso para retomar e status ao lado do progresso */
+.draft-b { display: flex; justify-content: space-between; align-items: center; gap: 12px 20px; flex-wrap: wrap; border: 1px solid var(--sel-line); color: var(--fg); }
+.draft-b p { margin: 0; }
+.bar-info { display: flex; flex-direction: column; gap: 2px; }
+.draft-st { margin: 0; font-size: 13px; color: var(--muted); }
+.draft-st.bad { color: var(--err); font-weight: 600; }
