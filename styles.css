@@ -431,3 +431,6 @@ footer { padding-block: 40px 56px; color: var(--muted); font-size: 13px; }
   th, td { padding: 5px 6px; overflow-wrap: anywhere; } td.num, th.num { white-space: normal; } th { font-size: 7.5pt; letter-spacing: 0.04em; }
 }
 .aud-tabs { margin-top: 4px; }
+/* Conteúdo montado só para o PDF: nunca aparece na tela */
+.print-only { display: none !important; }
+@media print { .print-only { display: block !important; } }

@@ -1074,7 +1074,7 @@
     card.addEventListener("click", function () { openMod = openMod === id ? null : id; renderAll(); if (openMod) setTimeout(function () { var p = document.getElementById("mod-" + id); if (p) p.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, 30); });
     var wrap = el("div", { class: "mod" + (openMod === id ? " on" : "") }, [card]);
     // No PDF, todos os módulos saem abertos
-    return { card: wrap, panel: (printMode || openMod === id) ? el("section", { class: "mod-p", id: "mod-" + id, "aria-label": title }, [el("div", { class: "mod-ph" }, [el("h3", { text: title }), el("button", { class: "lnk", type: "button", text: "Fechar" })]), build()]) : null };
+    return { card: wrap, panel: (printMode || openMod === id) ? el("section", { class: "mod-p" + (openMod === id ? "" : " print-only"), id: "mod-" + id, "aria-label": title }, [el("div", { class: "mod-ph" }, [el("h3", { text: title }), el("button", { class: "lnk", type: "button", text: "Fechar" })]), build()]) : null };
   }
 
   /* ---------- Indicadores: a história ---------- */
@@ -1385,12 +1385,11 @@
     $("#printHead").textContent = "Indicadores · Entrevista de Desligamento V2 · gerado em " + brDateTime(new Date().toISOString()) + " · Recorte: " + recorteTexto() + " · " + filtered().length + " entrevistas";
     document.body.classList.add("printing");
     renderAll();
-    setTimeout(function () { window.print(); }, 120);
+    setTimeout(function () { window.print(); sairDoPdf(); }, 120);
   }
-  window.addEventListener("afterprint", function () {
-    if (!printMode) return;
-    printMode = false; document.body.classList.remove("printing"); renderAll();
-  });
+  // A tela volta exatamente como estava; o "afterprint" fica só de reserva
+  function sairDoPdf() { if (!printMode) return; printMode = false; document.body.classList.remove("printing"); renderAll(); }
+  window.addEventListener("afterprint", sairDoPdf);
   $("#dlPdf").addEventListener("click", function () { $("#dlmenu").open = false; pdfPagina(); });
   $("#dlXls").addEventListener("click", function () { $("#dlmenu").open = false; xlsRecorte(); });
   document.addEventListener("click", function (e) { var d = $("#dlmenu"); if (d.open && !d.contains(e.target)) d.open = false; });
